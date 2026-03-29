@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "datatype_registry",
+  "description": "문서에서 수집한 데이터 타입 전체 집합(일반 SW primitive + IP 아키텍처 전용 타입).",
+  "type": "object",
+  "required": [
+    "trace_id",
+    "type_id",
+    "type_name_raw",
+    "category",
+    "source_refs"
+  ],
+  "properties": {
+    "trace_id": { "type": "string" },
+    "type_id": {
+      "type": "string",
+      "description": "정규화된 고유 ID(슬러그). 필드의 data_type_ref가 이 값을 가리킴."
+    },
+    "type_name_raw": {
+      "type": "string",
+      "description": "문서/표에 나온 타입 명칭 그대로."
+    },
+    "type_name_normalized": {
+      "type": "string",
+      "description": "동의어·공백 정리 후 표준 표기(선택)."
+    },
+    "category": {
+      "type": "string",
+      "enum": ["software_primitive", "ip_architecture", "alias", "unknown"],
+      "description": "software_primitive=일반 정수/비트/열거 등, ip_architecture=TRM에만 정의된 특수 타입, alias=다른 타입 동의어"
+    },
+    "aliases": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "동일 타입을 가리키는 다른 표기(선택)."
+    },
+    "description": {
+      "type": "string",
+      "description": "문서 인용 요약 또는 의미 설명."
+    },
+    "value_constraint_summary": {
+      "type": "string",
+      "description": "허용 범위·비트 폭·예약값 등 한 줄 요약."
+    },
+    "value_generation_method": {
+      "type": "string",
+      "description": "값 생성 규칙(인코딩, 파생 필드, 수식, LUT 등) 자연어 또는 구조화 전 단계."
+    },
+    "source_refs": { "type": "array", "items": { "type": "object" } }
+  },
+  "additionalProperties": true
+}

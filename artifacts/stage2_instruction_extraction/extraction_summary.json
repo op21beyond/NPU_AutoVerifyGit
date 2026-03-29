@@ -1,0 +1,6 @@
+{
+  "stage_run_id": "stage2_instruction_extraction-b6487f4cdd08",
+  "instruction_count": 1,
+  "page_blocks_path": "d:\\Users\\op21b\\NPU_AutoVerify\\artifacts\\_synth_page_blocks.jsonl",
+  "output_schema_version": "instruction_catalog@1"
+}

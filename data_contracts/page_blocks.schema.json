@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "page_blocks",
+  "type": "object",
+  "required": [
+    "trace_id",
+    "stage_name",
+    "stage_run_id",
+    "document_id",
+    "page",
+    "block_id",
+    "block_type",
+    "bbox",
+    "raw_text",
+    "extraction_method",
+    "confidence_score",
+    "source_refs"
+  ],
+  "properties": {
+    "trace_id": { "type": "string" },
+    "stage_name": { "type": "string" },
+    "stage_run_id": { "type": "string" },
+    "document_id": { "type": "string" },
+    "page": { "type": "integer", "minimum": 1 },
+    "block_id": {
+      "type": "string",
+      "description": "페이지 내 블록을 안정적으로 가리키는 식별자(예: p3_b12). 표-설명-수식 연결 등에 사용."
+    },
+    "block_type": { "type": "string", "enum": ["text", "table", "image", "equation", "other"] },
+    "bbox": {
+      "type": "array",
+      "items": { "type": "number" },
+      "minItems": 4,
+      "maxItems": 4
+    },
+    "raw_text": { "type": "string" },
+    "extraction_method": { "type": "string" },
+    "confidence_score": { "type": "number", "minimum": 0, "maximum": 1 },
+    "source_refs": { "type": "array", "items": { "type": "object" } },
+    "relationships": {
+      "type": "array",
+      "description": "블록 간 구조/설명 연결.",
+      "items": {
+        "type": "object",
+        "required": ["type", "target"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "관계 종류. 예: above, below, described_by, continues, caption_of 및 문서/파이프라인에서 정의하는 추가 값."
+          },
+          "target": {
+            "type": "string",
+            "description": "대상 블록의 block_id"
+          }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

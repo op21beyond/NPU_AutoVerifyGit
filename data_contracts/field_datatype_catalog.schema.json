@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "field_datatype_catalog",
+  "type": "object",
+  "required": [
+    "trace_id",
+    "field_name",
+    "data_type_ref",
+    "source_refs"
+  ],
+  "properties": {
+    "trace_id": { "type": "string" },
+    "instruction_name": {
+      "type": "string",
+      "description": "필드가 속한 명령(스코프가 있을 때)."
+    },
+    "field_name": { "type": "string" },
+    "data_type_raw": {
+      "type": "string",
+      "description": "표/필드 행에 적힌 타입 문자열 그대로(선택)."
+    },
+    "data_type_ref": {
+      "type": "string",
+      "description": "`datatype_registry.type_id` 참조. IP 전용·primitive 공통."
+    },
+    "source_refs": { "type": "array", "items": { "type": "object" } }
+  },
+  "additionalProperties": true
+}

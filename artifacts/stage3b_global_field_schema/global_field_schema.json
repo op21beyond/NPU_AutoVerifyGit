@@ -1,0 +1,16 @@
+{
+  "stage_name": "stage3b_global_field_schema",
+  "stage_run_id": "stage3b_global_field_schema-366ed764ebb3",
+  "canonical_field_names": [
+    "OPCODE",
+    "SRC"
+  ],
+  "field_count_per_instruction": {
+    "CONV": [
+      "OPCODE",
+      "SRC"
+    ]
+  },
+  "alias_catalog": "field_alias_map.jsonl",
+  "output_schema_version": "global_field_schema@1"
+}

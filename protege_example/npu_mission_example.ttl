@@ -1,0 +1,159 @@
+@prefix : <http://example.org/npu-autoverify/ontology#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<http://example.org/npu-autoverify/ontology> a owl:Ontology ;
+    rdfs:label "NPU AutoVerify mission (Protege practice example)"@en ;
+    rdfs:comment "Illustrative ontology only. Not used by the extraction pipeline."@en .
+
+#################################################################
+# Classes
+#################################################################
+
+:IP a owl:Class ;
+    rdfs:label "IP"@en ;
+    rdfs:comment "Top-level IP / product context."@en .
+
+:ExecutionUnit a owl:Class ;
+    rdfs:label "Execution unit"@en ;
+    rdfs:comment "Hardware block where an instruction executes."@en .
+
+:Instruction a owl:Class ;
+    rdfs:label "Instruction"@en .
+
+:Field a owl:Class ;
+    rdfs:label "Instruction field"@en .
+
+:DataTypeRegistryEntry a owl:Class ;
+    rdfs:label "Data type registry entry"@en ;
+    rdfs:comment "Entry in datatype_registry (primitive or IP-defined)."@en .
+
+:ValueDomain a owl:Class ;
+    rdfs:label "Value domain"@en ;
+    rdfs:comment "Allowed values/range for a field instance."@en .
+
+:Constraint a owl:Class ;
+    rdfs:label "Constraint"@en .
+
+:ConstraintType a owl:Class ;
+    rdfs:label "Constraint type (taxonomy)"@en .
+
+:Evidence a owl:Class ;
+    rdfs:label "Evidence"@en ;
+    rdfs:comment "Pointer to document excerpt (page, bbox, etc.)."@en .
+
+:PageBlock a owl:Class ;
+    rdfs:label "Page block"@en .
+
+#################################################################
+# Object properties
+#################################################################
+
+:hasInstruction a owl:ObjectProperty ;
+    rdfs:domain :IP ;
+    rdfs:range :Instruction ;
+    rdfs:label "has instruction"@en .
+
+:executesOn a owl:ObjectProperty ;
+    rdfs:domain :Instruction ;
+    rdfs:range :ExecutionUnit ;
+    rdfs:label "executes on"@en .
+
+:hasField a owl:ObjectProperty ;
+    rdfs:domain :Instruction ;
+    rdfs:range :Field ;
+    rdfs:label "has field"@en .
+
+:hasDataType a owl:ObjectProperty ;
+    rdfs:domain :Field ;
+    rdfs:range :DataTypeRegistryEntry ;
+    rdfs:label "has data type (registry ref)"@en .
+
+:hasValueDomain a owl:ObjectProperty ;
+    rdfs:domain :Field ;
+    rdfs:range :ValueDomain ;
+    rdfs:label "has value domain"@en .
+
+:instanceOfConstraintType a owl:ObjectProperty ;
+    rdfs:domain :Constraint ;
+    rdfs:range :ConstraintType ;
+    rdfs:label "instance of constraint type"@en .
+
+:appliesToField a owl:ObjectProperty ;
+    rdfs:domain :Constraint ;
+    rdfs:range :Field ;
+    rdfs:label "applies to field"@en .
+
+:appliesToInstruction a owl:ObjectProperty ;
+    rdfs:domain :Constraint ;
+    rdfs:range :Instruction ;
+    rdfs:label "applies to instruction"@en .
+
+:supportedBy a owl:ObjectProperty ;
+    rdfs:domain owl:Thing ;
+    rdfs:range :Evidence ;
+    rdfs:label "supported by evidence"@en .
+
+#################################################################
+# Data properties
+#################################################################
+
+:instructionName a owl:DatatypeProperty ;
+    rdfs:domain :Instruction ;
+    rdfs:range xsd:string .
+
+:opcodeValue a owl:DatatypeProperty ;
+    rdfs:domain :Instruction ;
+    rdfs:range xsd:integer .
+
+:opcodeRaw a owl:DatatypeProperty ;
+    rdfs:domain :Instruction ;
+    rdfs:range xsd:string .
+
+:instructionKind a owl:DatatypeProperty ;
+    rdfs:domain :Instruction ;
+    rdfs:range xsd:string ;
+    rdfs:comment "macro | micro | unknown"@en .
+
+:fieldName a owl:DatatypeProperty ;
+    rdfs:domain :Field ;
+    rdfs:range xsd:string .
+
+:typeId a owl:DatatypeProperty ;
+    rdfs:domain :DataTypeRegistryEntry ;
+    rdfs:range xsd:string .
+
+:normalizedExpression a owl:DatatypeProperty ;
+    rdfs:domain :Constraint ;
+    rdfs:range xsd:string .
+
+#################################################################
+# Example individuals (optional, for browsing in Protege)
+#################################################################
+
+:SampleIP a :IP ;
+    rdfs:label "Sample NPU IP"@en .
+
+:SampleEU a :ExecutionUnit ;
+    rdfs:label "VEC0"@en .
+
+:SampleInstr a :Instruction ;
+    :instructionName "NOP_PLACEHOLDER" ;
+    :opcodeValue 0 ;
+    :instructionKind "unknown" ;
+    :executesOn :SampleEU .
+
+:SampleIP :hasInstruction :SampleInstr .
+
+:SampleField_OPC a :Field ;
+    :fieldName "OPCODE" .
+
+:SampleInstr :hasField :SampleField_OPC .
+
+:Type_uint4 a :DataTypeRegistryEntry ;
+    :typeId "uint4" ;
+    rdfs:label "uint4"@en .
+
+:SampleField_OPC :hasDataType :Type_uint4 .

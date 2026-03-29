@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "test_case_matrix",
+  "type": "object",
+  "required": ["trace_id", "instruction_name", "constraint_satisfaction_status"],
+  "properties": {
+    "trace_id": { "type": "string" },
+    "instruction_name": { "type": "string" },
+    "constraint_satisfaction_status": { "type": "string" }
+  },
+  "additionalProperties": true
+}

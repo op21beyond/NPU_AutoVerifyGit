@@ -1,0 +1,9 @@
+{
+  "document_id": "_tmp_test",
+  "total_pages": 1,
+  "pages_with_blocks": 1,
+  "parse_success_rate": 1.0,
+  "total_blocks": 1,
+  "ocr_candidate_pages_count": 1,
+  "output_schema_version": "page_blocks@1"
+}

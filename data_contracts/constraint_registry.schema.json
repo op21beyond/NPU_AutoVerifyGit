@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "constraint_registry",
+  "type": "object",
+  "required": [
+    "trace_id",
+    "constraint_id",
+    "constraint_type_level1",
+    "constraint_type_level2",
+    "expression",
+    "classification_rationale",
+    "applies_to",
+    "source_refs"
+  ],
+  "properties": {
+    "trace_id": { "type": "string" },
+    "constraint_id": { "type": "string" },
+    "constraint_type_level1": { "type": "string" },
+    "constraint_type_level2": { "type": "string" },
+    "expression": { "type": "string" },
+    "classification_rationale": { "type": "string" },
+    "applies_to": { "type": "object" },
+    "source_refs": { "type": "array", "items": { "type": "object" } }
+  }
+}

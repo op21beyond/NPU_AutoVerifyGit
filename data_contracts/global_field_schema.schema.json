@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "global_field_schema",
+  "description": "Step 3b 산출: 전역 unique 필드명 집합 및 명령어별 필드 집합 요약.",
+  "type": "object",
+  "required": ["stage_run_id", "canonical_field_names"],
+  "properties": {
+    "stage_run_id": { "type": "string" },
+    "canonical_field_names": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "모든 명령에서 등장한 필드 이름의 정규화된 전역 집합(정렬 권장)."
+    },
+    "field_count_per_instruction": {
+      "type": "object",
+      "description": "선택: 명령어별 필드 이름 목록.",
+      "additionalProperties": { "type": "array", "items": { "type": "string" } }
+    },
+    "alias_catalog": { "type": "string", "description": "별칭 테이블 파일명 참조." }
+  },
+  "additionalProperties": true
+}
