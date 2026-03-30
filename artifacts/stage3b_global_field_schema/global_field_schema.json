@@ -1,6 +1,6 @@
 {
   "stage_name": "stage3b_global_field_schema",
-  "stage_run_id": "stage3b_global_field_schema-366ed764ebb3",
+  "stage_run_id": "stage3b_global_field_schema-c3309e9d55b3",
   "canonical_field_names": [
     "OPCODE",
     "SRC"

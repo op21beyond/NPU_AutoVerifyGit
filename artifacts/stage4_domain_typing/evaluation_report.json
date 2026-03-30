@@ -1,0 +1,68 @@
+{
+  "sections": {
+    "datatype_registry": {
+      "metrics": {
+        "true_positive_count": 1,
+        "false_positive_count": 0,
+        "false_negative_count": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      "true_positives": [
+        "uint4"
+      ],
+      "false_positives": [],
+      "false_negatives": []
+    },
+    "field_datatype_catalog": {
+      "metrics": {
+        "true_positive_count": 2,
+        "false_positive_count": 0,
+        "false_negative_count": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      "true_positives": [
+        [
+          "CONV",
+          "OPCODE",
+          "uint4"
+        ],
+        [
+          "CONV",
+          "SRC",
+          "uint4"
+        ]
+      ],
+      "false_positives": [],
+      "false_negatives": []
+    },
+    "field_domain_catalog": {
+      "metrics": {
+        "true_positive_count": 2,
+        "false_positive_count": 0,
+        "false_negative_count": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      "true_positives": [
+        [
+          "OPCODE",
+          "range",
+          "0..15"
+        ],
+        [
+          "SRC",
+          "range",
+          "0..15"
+        ]
+      ],
+      "false_positives": [],
+      "false_negatives": []
+    }
+  },
+  "ground_truth_path": "D:\\Users\\op21b\\NPU_AutoVerify\\artifacts\\_gt_stage4.json"
+}

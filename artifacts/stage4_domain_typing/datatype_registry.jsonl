@@ -1,0 +1,1 @@
+{"trace_id": "stage4_domain_typing-c33e55567980:reg:uint4", "type_id": "uint4", "type_name_raw": "uint4", "type_name_normalized": "uint4", "category": "software_primitive", "description": "Inferred unsigned integer type from field bit widths (4 bits)", "value_constraint_summary": "0..15", "value_generation_method": "", "source_refs": []}

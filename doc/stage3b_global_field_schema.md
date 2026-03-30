@@ -17,6 +17,9 @@
 - 오픈 이슈:
   - 동의어·표기 차이 병합·`rapidfuzz` alias 후보 미구현
   - OCR 오타 교정 미구현
+- Ground truth 옵션:
+  - `--ground-truth-as-output` + `--ground-truth`로 GT 기반 `global_field_schema.json` 직접 생성
+  - `--ground-truth`만 주면 추출 결과를 `evaluation_report.json`로 성능평가
 - 다음 액션:
   - 용어집 블록과 필드명 매칭
   - Step 4와 필드 문자열 정렬 규칙 통일

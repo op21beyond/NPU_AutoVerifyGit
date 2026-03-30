@@ -15,8 +15,11 @@
   - 미분류 제약(`unclassified_constraint`) 관리
 
 ## Status
-- 상태: Scaffolded
-- 구현률: 25%
+- 상태: Implemented (`field_domain_catalog` 기반 제약 행 + `instruction_catalog`·타입·필드 연결 온톨로지)
+- 구현률: ~45%
+- Ground truth 옵션:
+  - `--ground-truth-as-output` + `--ground-truth PATH` — GT JSON에서 `constraint_registry`·`mission_ontology_graph` 직접 기록
+  - `--ground-truth`만 — `constraint_id` 집합 및 온톨로지 `nodes(id)` / `edges(from,rel,to)` 기준으로 `evaluation_report.json`
 - 오픈 이슈:
   - 제약 후보 수집/클러스터링 미구현
   - 온톨로지 그래프는 seed 수준

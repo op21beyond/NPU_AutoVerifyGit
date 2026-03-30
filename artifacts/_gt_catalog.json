@@ -1,0 +1,3 @@
+﻿[
+  {"instruction_name": "CONV", "opcode_raw": "0x2A", "execution_unit": "EU0", "instruction_kind": "micro"}
+]

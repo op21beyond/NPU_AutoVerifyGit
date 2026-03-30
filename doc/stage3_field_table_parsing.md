@@ -15,6 +15,9 @@
 - 오픈 이슈:
   - 이미지 표·OpenCV 셀 분할 미연동
   - 복잡 레이아웃에서 표-명령 1:1 매핑 한계
+- Ground truth 옵션:
+  - `--ground-truth-as-output` + `--ground-truth`로 GT 기반 `instruction_field_map` 직접 생성
+  - `--ground-truth`만 주면 추출 결과를 GT로 성능평가(`evaluation_report.json`)
 - 다음 액션:
   - OCR 표 구조와 행 매핑
   - 실 PDF로 열 인덱스·헤더 튜닝

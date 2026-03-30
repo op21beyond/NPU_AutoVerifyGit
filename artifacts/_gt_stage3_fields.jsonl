@@ -1,0 +1,2 @@
+﻿{"instruction_name":"CONV","field_name":"OPCODE","bit_range":"31:28","word_index":0}
+{"instruction_name":"CONV","field_name":"SRC","bit_range":"3:0","word_index":0}

@@ -14,6 +14,8 @@
 - 구현: `src/stage2_instruction_extraction/extract.py` — 본문/표 텍스트에서 `NAME (0x..)`, `0x..—NAME`, `NAME=0x..`, 표 두 열 패턴 + `parse_opcode_token`; 동일 이름 병합
 - 선택: `--extractor openai` — OpenAI Chat Completions(JSON object) 기반 추출(`llm_openai.py`). 환경변수 `OPENAI_API_KEY`, 선택 `OPENAI_BASE_URL` 대신 `--openai-base-url`로 OpenAI 호환 엔드포인트 지정 가능. `--openai-model`(기본 `gpt-4o-mini`)
 - 평가: `--ground-truth PATH` — 정답 instruction 목록 파일. 추출 후 `artifacts/stage2_instruction_extraction/evaluation_report.json`에 precision/recall/F1·FP/FN 목록·(선택) opcode_value 일치 수 기록. 형식: `.txt`는 한 줄에 하나( `#` 주석 가능), `.json`은 `["A","B"]` 또는 `[{"instruction_name":"CONV","opcode_value":42}]`, `.jsonl`은 객체/문자열 한 줄씩
+- 보강 입력: `--supplemental-text-corpus PATH` — Stage1 `pymupdf4llm_corpus.json`을 읽어 pseudo block으로 합쳐 regex 추출 recall을 보강. 미지정 시 기본 경로(`artifacts/stage1_ingestion/pymupdf4llm_corpus.json`) 자동 탐지(해제: `--disable-default-supplemental-text`)
+- 정답 직접 출력: `--ground-truth-as-catalog` + `--ground-truth PATH` — regex/LLM 추출을 건너뛰고 정답 파일만으로 `instruction_catalog.jsonl` 생성(JSON 객체에 `opcode_raw`/`opcode_value`, 선택 `execution_unit`/`instruction_kind`/`aliases` 지원). 이 모드에서는 `--ground-truth` 성능 평가 리포트를 생략(출력이 정답과 동일)
 - 오픈 이슈:
   - LLM low-confidence 보정 게이트 미구현
   - execution_unit은 히트 주변 스니펫 기준이라 같은 블록 원문 전체 맥락 미반영 가능

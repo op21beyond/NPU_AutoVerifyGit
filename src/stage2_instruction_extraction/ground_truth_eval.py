@@ -4,6 +4,9 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List, Set
 
+from src.common.opcode import parse_opcode_token
+from src.common.runtime import StageRun
+
 
 def _norm_name(s: str) -> str:
     return s.strip().upper()
@@ -95,8 +98,90 @@ def _normalize_gt_objects(objs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                 pass
         if o.get("opcode_raw") is not None:
             row["opcode_raw"] = str(o["opcode_raw"])
+        if o.get("execution_unit") is not None:
+            row["execution_unit"] = str(o["execution_unit"]).strip()
+        if o.get("instruction_kind") is not None:
+            row["instruction_kind"] = str(o["instruction_kind"]).strip().lower()
+        if isinstance(o.get("aliases"), list):
+            row["aliases"] = [str(a).strip() for a in o["aliases"] if str(a).strip()]
         out.append(row)
     return out
+
+
+def _clamp_instruction_kind(raw: Any) -> str:
+    s = str(raw or "unknown").lower().strip()
+    if s in ("macro", "micro", "unknown"):
+        return s
+    return "unknown"
+
+
+def _opcode_raw_from_gt_entry(gt: Dict[str, Any]) -> str:
+    raw = gt.get("opcode_raw")
+    if raw is not None and str(raw).strip() and str(raw).strip().upper() != "UNKNOWN":
+        return str(raw).strip()
+    ov = gt.get("opcode_value")
+    if ov is not None:
+        try:
+            v = int(ov)
+            return f"0x{v:x}"
+        except (TypeError, ValueError):
+            pass
+    return "UNKNOWN"
+
+
+def build_instruction_catalog_from_ground_truth(
+    gt_rows: List[Dict[str, Any]],
+    run: StageRun,
+) -> List[Dict[str, Any]]:
+    """
+    Build instruction_catalog rows directly from a ground-truth file (skip regex/LLM).
+    Duplicate instruction_name entries keep the last occurrence.
+    """
+    by_name: Dict[str, Dict[str, Any]] = {}
+    for gt in gt_rows:
+        n = gt.get("instruction_name")
+        if not n:
+            continue
+        key = _norm_name(str(n))
+        by_name[key] = gt
+
+    rows: List[Dict[str, Any]] = []
+    for idx, name in enumerate(sorted(by_name.keys())):
+        gt = by_name[name]
+        opc_raw = _opcode_raw_from_gt_entry(gt)
+        opc_val, opc_radix = parse_opcode_token(opc_raw)
+        if opc_val is None and gt.get("opcode_value") is not None:
+            try:
+                opc_val = int(gt["opcode_value"])
+            except (TypeError, ValueError):
+                opc_val = None
+            opc_radix = "unknown"
+
+        eu = str(gt.get("execution_unit", "UNKNOWN_UNIT")).strip() or "UNKNOWN_UNIT"
+        kind = _clamp_instruction_kind(gt.get("instruction_kind"))
+        aliases = gt.get("aliases")
+        if not isinstance(aliases, list):
+            aliases = []
+        aliases = [str(a).strip() for a in aliases if str(a).strip()]
+
+        rows.append(
+            {
+                "trace_id": f"{run.stage_run_id}:gt:{idx}",
+                "stage_name": run.stage_name,
+                "stage_run_id": run.stage_run_id,
+                "instruction_name": name,
+                "aliases": aliases,
+                "opcode_raw": opc_raw,
+                "opcode_radix": opc_radix,
+                "opcode_value": opc_val,
+                "execution_unit": eu,
+                "instruction_kind": kind,
+                "instruction_kind_confidence": 1.0,
+                "confidence_score": 1.0,
+                "source_refs": [{"method": "ground_truth_catalog", "ground_truth": True}],
+            }
+        )
+    return rows
 
 
 def _pred_name_set(rows: List[Dict[str, Any]]) -> Set[str]:

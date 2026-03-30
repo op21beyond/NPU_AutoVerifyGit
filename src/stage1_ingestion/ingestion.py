@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import fitz
 
@@ -72,6 +72,24 @@ class PageMetrics:
     ocr_reasons: List[str] = field(default_factory=list)
 
 
+@dataclass
+class HeaderFooterFilterStats:
+    mode: str
+    removed_count: int = 0
+    removed_text_count: int = 0
+    removed_equation_count: int = 0
+    removed_pages: Set[int] = field(default_factory=set)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "mode": self.mode,
+            "removed_count": self.removed_count,
+            "removed_text_count": self.removed_text_count,
+            "removed_equation_count": self.removed_equation_count,
+            "removed_pages": sorted(self.removed_pages),
+        }
+
+
 def _evaluate_ocr_routing(m: PageMetrics, min_chars: int, image_weight: int) -> None:
     reasons: List[str] = []
     if m.char_count < min_chars:
@@ -97,6 +115,7 @@ def _extract_tables(
 ) -> Tuple[List[Dict[str, Any]], int]:
     rows: List[Dict[str, Any]] = []
     try:
+        page_height = float(page.rect.height)
         finder = page.find_tables()
         tables = getattr(finder, "tables", None) or []
     except (AttributeError, RuntimeError):
@@ -129,7 +148,14 @@ def _extract_tables(
                 "raw_text": raw,
                 "extraction_method": "pymupdf_find_tables",
                 "confidence_score": _confidence_table(char_count),
-                "source_refs": [{"page": page_number, "bbox": list(bbox), "method": "pymupdf_find_tables"}],
+                "source_refs": [
+                    {
+                        "page": page_number,
+                        "bbox": list(bbox),
+                        "method": "pymupdf_find_tables",
+                        "page_height": page_height,
+                    }
+                ],
             }
         )
         block_counter += 1
@@ -147,6 +173,7 @@ def _text_blocks_from_dict(
 ) -> Tuple[List[Dict[str, Any]], int]:
     rows: List[Dict[str, Any]] = []
     td = page.get_text("dict")
+    page_height = float(page.rect.height)
     blocks = td.get("blocks") or []
 
     text_items: List[Tuple[Tuple[float, float, float, float], str, int]] = []
@@ -187,7 +214,14 @@ def _text_blocks_from_dict(
                 "raw_text": raw,
                 "extraction_method": "text_layer",
                 "confidence_score": _confidence_text_layer(total_text_chars, char_count),
-                "source_refs": [{"page": page_number, "bbox": list(bbox), "method": "text_layer"}],
+                "source_refs": [
+                    {
+                        "page": page_number,
+                        "bbox": list(bbox),
+                        "method": "text_layer",
+                        "page_height": page_height,
+                    }
+                ],
             }
         )
         block_counter += 1
@@ -207,7 +241,14 @@ def _text_blocks_from_dict(
                 "raw_text": "",
                 "extraction_method": "image_raster",
                 "confidence_score": _confidence_image_no_ocr(),
-                "source_refs": [{"page": page_number, "bbox": list(bbox), "method": "image_raster"}],
+                "source_refs": [
+                    {
+                        "page": page_number,
+                        "bbox": list(bbox),
+                        "method": "image_raster",
+                        "page_height": page_height,
+                    }
+                ],
             }
         )
         block_counter += 1
@@ -236,6 +277,101 @@ def _split_equation_tags(rows: List[Dict[str, Any]]) -> None:
             row["source_refs"] = [
                 {**(row["source_refs"][0] if row["source_refs"] else {}), "method": "text_layer+heuristic_equation"}
             ]
+
+
+def _normalize_repeat_text(s: str) -> str:
+    x = re.sub(r"\d+", "#", s.strip().lower())
+    x = re.sub(r"\s+", " ", x)
+    return x
+
+
+def _drop_header_footer_by_position(
+    rows: List[Dict[str, Any]],
+    top_ratio: float,
+    bottom_ratio: float,
+) -> Tuple[List[Dict[str, Any]], HeaderFooterFilterStats]:
+    stats = HeaderFooterFilterStats(mode="position")
+    kept: List[Dict[str, Any]] = []
+    tr = max(0.0, min(0.3, top_ratio))
+    br = max(0.0, min(0.3, bottom_ratio))
+    for row in rows:
+        btype = row.get("block_type", "")
+        if btype not in ("text", "equation"):
+            kept.append(row)
+            continue
+        bbox = row.get("bbox", [])
+        if not isinstance(bbox, list) or len(bbox) < 4:
+            kept.append(row)
+            continue
+        y0 = float(bbox[1])
+        y1 = float(bbox[3])
+        refs = row.get("source_refs") or []
+        page_h = None
+        if refs and isinstance(refs[0], dict):
+            page_h = refs[0].get("page_height")
+        if page_h is None:
+            # Fallback: no page height metadata, skip filtering for this row.
+            kept.append(row)
+            continue
+        ph = float(page_h)
+        if ph <= 0:
+            kept.append(row)
+            continue
+        is_top = y1 <= (ph * tr)
+        is_bottom = y0 >= (ph * (1.0 - br))
+        if is_top or is_bottom:
+            stats.removed_count += 1
+            if btype == "text":
+                stats.removed_text_count += 1
+            elif btype == "equation":
+                stats.removed_equation_count += 1
+            stats.removed_pages.add(int(row.get("page", 1)))
+            continue
+        kept.append(row)
+    return kept, stats
+
+
+def _drop_header_footer_by_repetition(
+    rows: List[Dict[str, Any]],
+    min_repeat_pages: int,
+    max_chars: int,
+) -> Tuple[List[Dict[str, Any]], HeaderFooterFilterStats]:
+    stats = HeaderFooterFilterStats(mode="repeat")
+    min_pages = max(2, min_repeat_pages)
+    max_len = max(1, max_chars)
+    page_map: Dict[str, Set[int]] = {}
+    for row in rows:
+        btype = row.get("block_type", "")
+        if btype not in ("text", "equation"):
+            continue
+        raw = (row.get("raw_text") or "").strip()
+        if not raw or len(raw) > max_len:
+            continue
+        norm = _normalize_repeat_text(raw)
+        if not norm:
+            continue
+        page = int(row.get("page", 1))
+        page_map.setdefault(norm, set()).add(page)
+    repeated = {k for k, pages in page_map.items() if len(pages) >= min_pages}
+
+    kept: List[Dict[str, Any]] = []
+    for row in rows:
+        btype = row.get("block_type", "")
+        if btype not in ("text", "equation"):
+            kept.append(row)
+            continue
+        raw = (row.get("raw_text") or "").strip()
+        norm = _normalize_repeat_text(raw)
+        if raw and len(raw) <= max_len and norm in repeated:
+            stats.removed_count += 1
+            if btype == "text":
+                stats.removed_text_count += 1
+            elif btype == "equation":
+                stats.removed_equation_count += 1
+            stats.removed_pages.add(int(row.get("page", 1)))
+            continue
+        kept.append(row)
+    return kept, stats
 
 
 def try_full_page_ocr(page: fitz.Page, dpi: int = 150) -> Optional[str]:
@@ -267,16 +403,146 @@ def try_full_page_ocr(page: fitz.Page, dpi: int = 150) -> Optional[str]:
         return None
 
 
+def _confidence_ocr_image(text: str) -> float:
+    t = (text or "").strip()
+    if not t:
+        return 0.0
+    # Heuristic: more characters => higher confidence, capped.
+    return round(min(0.9, 0.45 + 0.005 * len(t)), 4)
+
+
+def try_ocr_image_bbox(
+    page: fitz.Page,
+    bbox: Tuple[float, float, float, float],
+    *,
+    engine: str = "tesseract",
+    dpi: int = 200,
+) -> Optional[str]:
+    """
+    OCR text from a page region cropped by `bbox`.
+
+    Supported engines:
+    - tesseract: requires `pytesseract` available and Tesseract binary on PATH
+    - paddleocr: requires `paddleocr` + dependencies
+    """
+    eng = (engine or "none").lower().strip()
+    if not eng or eng == "none":
+        return None
+
+    try:
+        rect = fitz.Rect(float(bbox[0]), float(bbox[1]), float(bbox[2]), float(bbox[3]))
+        if rect.is_empty or rect.width < 2 or rect.height < 2:
+            return None
+
+        mat = fitz.Matrix(dpi / 72.0, dpi / 72.0)
+        pix = page.get_pixmap(matrix=mat, clip=rect, alpha=False)
+
+        if pix.n == 4:
+            mode = "RGBA"
+        elif pix.n == 3:
+            mode = "RGB"
+        else:
+            mode = "L"
+
+        from PIL import Image
+
+        img = Image.frombytes(mode, [pix.width, pix.height], pix.samples)
+        if img.mode == "RGBA":
+            bg = Image.new("RGB", img.size, (255, 255, 255))
+            bg.paste(img, mask=img.split()[3])
+            img = bg
+        elif img.mode != "RGB":
+            img = img.convert("RGB")
+
+        if eng == "tesseract":
+            try:
+                import pytesseract
+            except ImportError:
+                return None
+            return pytesseract.image_to_string(img)
+
+        if eng == "paddleocr":
+            try:
+                import numpy as np
+                from paddleocr import PaddleOCR
+            except ImportError:
+                return None
+            ocr = PaddleOCR(use_angle_cls=True, lang="en", show_log=False)
+            arr = np.array(img)
+            result = ocr.ocr(arr, cls=True)
+            lines: List[str] = []
+            if result and result[0]:
+                for line in result[0]:
+                    if line and len(line) >= 2 and line[1] and line[1][0]:
+                        txt = line[1][0]
+                        if txt:
+                            lines.append(str(txt))
+            return "\n".join(lines) if lines else None
+
+        return None
+    except Exception:
+        return None
+
+
+def extract_pymupdf4llm_corpus(pdf_path: Path, max_chars_per_chunk: int = 6000) -> Dict[str, Any]:
+    """
+    Build a lightweight supplemental text corpus using pymupdf4llm.
+    This is intended for Stage2 recall boost, not bbox-accurate extraction.
+    """
+    try:
+        import pymupdf4llm  # type: ignore
+    except ImportError as e:
+        raise RuntimeError(
+            "pymupdf4llm is required for text-backend modes that include pymupdf4llm. "
+            "Install it with: pip install pymupdf4llm"
+        ) from e
+
+    markdown = pymupdf4llm.to_markdown(str(pdf_path))
+    if not isinstance(markdown, str):
+        markdown = str(markdown)
+
+    chunks: List[Dict[str, Any]] = []
+    text = markdown.strip()
+    if text:
+        for i in range(0, len(text), max_chars_per_chunk):
+            chunk = text[i : i + max_chars_per_chunk]
+            chunks.append(
+                {
+                    "chunk_id": f"md_{i // max_chars_per_chunk}",
+                    "text": chunk,
+                    "source": "pymupdf4llm_markdown",
+                }
+            )
+
+    return {
+        "backend": "pymupdf4llm",
+        "document_id": pdf_path.stem,
+        "chunk_count": len(chunks),
+        "chunks": chunks,
+    }
+
+
 def extract_page_blocks(
     pdf_path: Path,
     run: StageRun,
     *,
     min_chars_for_no_ocr: int = 40,
     run_full_page_ocr: bool = False,
+    image_ocr_engine: str = "none",
+    image_ocr_route: str = "needs_ocr",
+    image_ocr_dpi: int = 200,
+    image_ocr_min_chars: int = 5,
+    header_footer_mode: str = "none",
+    header_top_ratio: float = 0.08,
+    footer_bottom_ratio: float = 0.08,
+    repeat_min_pages: int = 3,
+    repeat_max_chars: int = 120,
 ) -> Tuple[List[Dict[str, Any]], List[PageMetrics], Dict[str, Any]]:
     document_id = pdf_path.stem
     all_rows: List[Dict[str, Any]] = []
     metrics_list: List[PageMetrics] = []
+    image_ocr_attempted_total = 0
+    image_ocr_success_total = 0
 
     doc = fitz.open(pdf_path)
     try:
@@ -312,6 +578,57 @@ def extract_page_blocks(
             )
             _evaluate_ocr_routing(m, min_chars_for_no_ocr, image_weight=1)
 
+            do_image_ocr = (image_ocr_engine or "none").lower().strip() != "none" and (
+                image_ocr_route == "always" or (image_ocr_route == "needs_ocr" and m.needs_ocr)
+            )
+            if do_image_ocr:
+                for row in page_rows:
+                    if row.get("block_type") != "image":
+                        continue
+                    raw_text = (row.get("raw_text") or "").strip()
+                    if raw_text:
+                        continue
+                    bbox = row.get("bbox") or []
+                    if not isinstance(bbox, list) or len(bbox) < 4:
+                        continue
+                    image_ocr_attempted_total += 1
+                    bbox_t = (float(bbox[0]), float(bbox[1]), float(bbox[2]), float(bbox[3]))
+                    ocr_text = try_ocr_image_bbox(
+                        page,
+                        bbox_t,
+                        engine=image_ocr_engine,
+                        dpi=image_ocr_dpi,
+                    )
+                    if ocr_text and ocr_text.strip() and len(ocr_text.strip()) >= image_ocr_min_chars:
+                        txt = ocr_text.strip()
+                        row["raw_text"] = txt
+                        row["block_type"] = "text"
+                        row["extraction_method"] = f"image_ocr_{image_ocr_engine}"
+                        row["confidence_score"] = _confidence_ocr_image(txt)
+                        prev_refs = row.get("source_refs") or []
+                        if prev_refs and isinstance(prev_refs[0], dict):
+                            row["source_refs"] = [
+                                {**prev_refs[0], "method": f"image_ocr_{image_ocr_engine}"},
+                            ]
+                        else:
+                            row["source_refs"] = [
+                                {
+                                    "page": page_number,
+                                    "bbox": list(bbox),
+                                    "method": f"image_ocr_{image_ocr_engine}",
+                                }
+                            ]
+                        image_ocr_success_total += 1
+
+                # Update m's counts after block_type conversion for OCR success.
+                text_n = sum(1 for r in page_rows if r.get("block_type") == "text")
+                img_n = sum(1 for r in page_rows if r.get("block_type") == "image")
+                tbl_n = sum(1 for r in page_rows if r.get("block_type") == "table")
+                eq_n = sum(1 for r in page_rows if r.get("block_type") == "equation")
+                m.text_blocks = text_n + eq_n
+                m.image_blocks = img_n
+                m.table_blocks = tbl_n
+
             if run_full_page_ocr and m.needs_ocr:
                 ocr_text = try_full_page_ocr(page)
                 if ocr_text and ocr_text.strip():
@@ -329,7 +646,14 @@ def extract_page_blocks(
                             "raw_text": ocr_text.strip(),
                             "extraction_method": "tesseract_full_page",
                             "confidence_score": round(min(0.92, 0.55 + 0.001 * len(ocr_text)), 4),
-                            "source_refs": [{"page": page_number, "bbox": "full_page", "method": "tesseract_full_page"}],
+                            "source_refs": [
+                                {
+                                    "page": page_number,
+                                    "bbox": "full_page",
+                                    "method": "tesseract_full_page",
+                                    "page_height": float(page.rect.height),
+                                }
+                            ],
                         }
                     )
 
@@ -339,6 +663,20 @@ def extract_page_blocks(
                 pages_ok += 1
             all_rows.extend(page_rows)
 
+        filter_stats = HeaderFooterFilterStats(mode=header_footer_mode)
+        if header_footer_mode == "position":
+            all_rows, filter_stats = _drop_header_footer_by_position(
+                all_rows,
+                top_ratio=header_top_ratio,
+                bottom_ratio=footer_bottom_ratio,
+            )
+        elif header_footer_mode == "repeat":
+            all_rows, filter_stats = _drop_header_footer_by_repetition(
+                all_rows,
+                min_repeat_pages=repeat_min_pages,
+                max_chars=repeat_max_chars,
+            )
+
         parse_success_rate = pages_ok / total_pages if total_pages else 1.0
         summary = {
             "document_id": document_id,
@@ -346,6 +684,11 @@ def extract_page_blocks(
             "pages_with_blocks": pages_ok,
             "parse_success_rate": round(parse_success_rate, 4),
             "total_blocks": len(all_rows),
+            "header_footer_filter": filter_stats.to_dict(),
+            "image_ocr_engine": image_ocr_engine,
+            "image_ocr_route": image_ocr_route,
+            "image_ocr_attempted": image_ocr_attempted_total,
+            "image_ocr_success": image_ocr_success_total,
         }
     finally:
         doc.close()

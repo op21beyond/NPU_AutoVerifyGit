@@ -1,0 +1,2 @@
+{"trace_id": "stage4_domain_typing-c33e55567980:dtype:0", "instruction_name": "CONV", "field_name": "OPCODE", "data_type_raw": "uint4", "data_type_ref": "uint4", "source_refs": [{"page": 1}]}
+{"trace_id": "stage4_domain_typing-c33e55567980:dtype:1", "instruction_name": "CONV", "field_name": "SRC", "data_type_raw": "uint4", "data_type_ref": "uint4", "source_refs": [{"page": 1}]}

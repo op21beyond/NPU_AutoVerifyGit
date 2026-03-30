@@ -168,7 +168,7 @@ def build_instruction_field_map(
         parsed: List[Tuple[str, str, int, float]] = []
         if btype == "table" and raw.strip():
             parsed = _parse_table_block(raw)
-        elif btype in ("text", "equation") and raw.strip():
+        elif btype in ("text", "equation", "image") and raw.strip():
             for line in raw.splitlines():
                 fn, br, wi, cf = _parse_loose_line(line)
                 if fn and br:

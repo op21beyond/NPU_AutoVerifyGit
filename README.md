@@ -16,7 +16,11 @@ Run Stage 1 only:
 python src/stage1_ingestion/main.py --input-pdf "path/to/architecture.pdf"
 ```
 
+Stage 1 (optional hybrid text backend): `python src/stage1_ingestion/main.py --input-pdf "...pdf" --text-backend hybrid` writes supplemental `artifacts/stage1_ingestion/pymupdf4llm_corpus.json`.
+
 Stage 2 (optional LLM): set `OPENAI_API_KEY`, then e.g. `python src/stage2_instruction_extraction/main.py --extractor openai --openai-model gpt-4o-mini`. Default is rule-based `--extractor regex`.
+
+Stage 2 (optional supplemental text from Stage 1): auto-loads `artifacts/stage1_ingestion/pymupdf4llm_corpus.json` if present. Override via `--supplemental-text-corpus PATH`, disable via `--disable-default-supplemental-text`.
 
 Stage 2 (evaluate vs reference list): `python src/stage2_instruction_extraction/main.py --ground-truth path/to/instructions.txt` — writes `artifacts/stage2_instruction_extraction/evaluation_report.json` (precision/recall/F1).
 

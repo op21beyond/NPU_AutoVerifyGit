@@ -13,8 +13,11 @@
   - 범위/열거/마스크/공식 표현 정규화
 
 ## Status
-- 상태: Scaffolded
-- 구현률: 30%
+- 상태: Implemented (휴리스틱: `instruction_field_map`의 `bit_range` 폭으로 `uintN` 타입·도메인 추론)
+- 구현률: ~55%
+- Ground truth 옵션:
+  - `--ground-truth-as-output` + `--ground-truth PATH` — GT JSON에서 `datatype_registry` / `field_datatype_catalog` / `field_domain_catalog` 배열을 읽어 산출물 직접 기록
+  - `--ground-truth`만 — 추출 결과와 GT를 비교해 `evaluation_report.json` (섹션별 type_id / 필드·타입 키 / 도메인 키)
 - 오픈 이슈:
   - TRM 본문에서 타입 정의·값 생성 규칙 자동 추출 미구현
   - 동일 타입 명칭의 동의어·별칭 병합 규칙 미정

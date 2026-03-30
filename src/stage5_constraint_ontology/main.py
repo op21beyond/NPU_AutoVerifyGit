@@ -1,57 +1,87 @@
 from __future__ import annotations
 
+import argparse
+from pathlib import Path
+
 from src.common.contracts import load_jsonl, write_json, write_jsonl
 from src.common.runtime import StageRun, artifact_path
 
+from src.stage5_constraint_ontology.constraint_ontology import (
+    build_constraint_registry,
+    build_mission_ontology_graph,
+)
+from src.stage5_constraint_ontology.ground_truth_eval import (
+    build_stage5_outputs_from_ground_truth,
+    evaluate_stage5_extraction,
+    load_stage5_ground_truth,
+)
+
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Stage5: constraint registry and mission ontology graph")
+    parser.add_argument(
+        "--ground-truth",
+        type=str,
+        default=None,
+        metavar="PATH",
+        help="Ground truth JSON (constraint_registry, mission_ontology_graph) for evaluation.",
+    )
+    parser.add_argument(
+        "--ground-truth-as-output",
+        action="store_true",
+        help="Skip extraction and write stage5 artifacts directly from --ground-truth JSON.",
+    )
+    args = parser.parse_args()
+
     run = StageRun.create("stage5_constraint_ontology")
+    out_dir = artifact_path("stage5_constraint_ontology")
+
+    if args.ground_truth_as_output:
+        if not args.ground_truth:
+            raise SystemExit("--ground-truth-as-output requires --ground-truth PATH")
+        gt_path = Path(args.ground_truth)
+        gt = load_stage5_ground_truth(gt_path)
+        constraints, ontology = build_stage5_outputs_from_ground_truth(gt, run)
+        write_jsonl(out_dir / "constraint_registry.jsonl", constraints)
+        write_json(out_dir / "mission_ontology_graph.json", ontology)
+        write_json(out_dir / "run_manifest.json", run.to_dict())
+        print(f"[GT-as-output] constraints={len(constraints)} nodes={len(ontology.get('nodes', []))} edges={len(ontology.get('edges', []))}")
+        return
+
     domains = load_jsonl(artifact_path("stage4_domain_typing", "field_domain_catalog.jsonl"))
+    datatype_catalog = load_jsonl(artifact_path("stage4_domain_typing", "field_datatype_catalog.jsonl"))
+    registry = load_jsonl(artifact_path("stage4_domain_typing", "datatype_registry.jsonl"))
     instructions = load_jsonl(artifact_path("stage2_instruction_extraction", "instruction_catalog.jsonl"))
-    constraints = [
-        {
-            "trace_id": f"{run.stage_run_id}:c0",
-            "constraint_id": "C_PLACEHOLDER_001",
-            "constraint_type_level1": "range",
-            "constraint_type_level2": "instruction-specific",
-            "expression": "0 <= OPCODE <= 15",
-            "classification_rationale": "seed placeholder",
-            "source_refs": domains[0]["source_refs"] if domains else [],
-            "applies_to": {"entity_type": "Field", "entity_name": "OPCODE"},
-        }
-    ]
-    inst0 = instructions[0] if instructions else {}
-    eu_name = str(inst0.get("execution_unit", "UNKNOWN_UNIT"))
-    inst_name = str(inst0.get("instruction_name", "UNKNOWN"))
-    inst_kind = str(inst0.get("instruction_kind", "unknown"))
-    opc_val = inst0.get("opcode_value")
-    instr_id = f"Instr:{opc_val}" if opc_val is not None else f"Instr:{inst_name}"
-    ontology = {
-        "nodes": [
-            {"type": "IP", "id": "IP:sample", "ip_name": "sample", "ip_type": "npu", "ip_version": "v0"},
-            {"type": "ExecutionUnit", "id": f"EU:{eu_name}", "name": eu_name},
-            {
-                "type": "Instruction",
-                "id": instr_id,
-                "instruction_name": inst_name,
-                "instruction_kind": inst_kind,
-                "opcode_raw": inst0.get("opcode_raw"),
-                "opcode_radix": inst0.get("opcode_radix"),
-                "opcode_value": opc_val,
-            },
-            {"type": "Field", "id": "Field:OPCODE"},
-            {"type": "Constraint", "id": "Constraint:C_PLACEHOLDER_001"},
-        ],
-        "edges": [
-            {"from": instr_id, "rel": "EXECUTES_ON", "to": f"EU:{eu_name}"},
-            {"from": "IP:sample", "rel": "HAS_INSTRUCTION", "to": instr_id},
-            {"from": "Constraint:C_PLACEHOLDER_001", "rel": "APPLIES_TO", "to": "Field:OPCODE"},
-        ],
-    }
-    write_jsonl(artifact_path("stage5_constraint_ontology", "constraint_registry.jsonl"), constraints)
-    write_json(artifact_path("stage5_constraint_ontology", "mission_ontology_graph.json"), ontology)
-    write_json(artifact_path("stage5_constraint_ontology", "run_manifest.json"), run.to_dict())
-    print("ontology skeleton generated")
+
+    constraints = build_constraint_registry(domains, instructions, run)
+    ontology = build_mission_ontology_graph(constraints, instructions, datatype_catalog, registry)
+
+    write_jsonl(out_dir / "constraint_registry.jsonl", constraints)
+    write_json(out_dir / "mission_ontology_graph.json", ontology)
+    write_json(out_dir / "run_manifest.json", run.to_dict())
+
+    if args.ground_truth:
+        gt_path = Path(args.ground_truth)
+        gt = load_stage5_ground_truth(gt_path)
+        report = evaluate_stage5_extraction(constraints, ontology, gt)
+        report["ground_truth_path"] = str(gt_path.resolve())
+        write_json(out_dir / "evaluation_report.json", report)
+        sec = report.get("sections") or {}
+        if "constraint_registry" in sec:
+            m = sec["constraint_registry"]["metrics"]
+            print(f"eval[constraint_registry] P={m.get('precision')} R={m.get('recall')} F1={m.get('f1')}")
+        mog = sec.get("mission_ontology_graph")
+        if isinstance(mog, dict):
+            if "nodes" in mog:
+                mn = mog["nodes"]["metrics"]
+                print(f"eval[ontology.nodes] P={mn.get('precision')} R={mn.get('recall')} F1={mn.get('f1')}")
+            if "edges" in mog:
+                me = mog["edges"]["metrics"]
+                print(f"eval[ontology.edges] P={me.get('precision')} R={me.get('recall')} F1={me.get('f1')}")
+
+    print(
+        f"constraints={len(constraints)} nodes={len(ontology.get('nodes', []))} edges={len(ontology.get('edges', []))}"
+    )
 
 
 if __name__ == "__main__":

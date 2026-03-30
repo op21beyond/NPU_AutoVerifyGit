@@ -15,11 +15,20 @@
   - `PyMuPDF`: 텍스트/이미지 블록(`get_text("dict")`), `find_tables()` 기반 표 블록(지원되는 PDF에서)
   - `artifacts/stage1_ingestion/page_blocks.jsonl`, `parsing_report.json`, `ocr_routing.json` 출력
   - 선택: `--ocr-full-page` 시 Tesseract 전면 OCR(라우팅된 페이지만, Tesseract PATH 필요)
+  - 선택: `--text-backend`로 `pymupdf4llm` 보조 코퍼스(`pymupdf4llm_corpus.json`) 생성 가능 (`pymupdf4llm`/`hybrid`)
+  - 선택: 헤더/푸터 제거 `--header-footer-mode`
+    - `position`: 페이지 상/하단 비율(`--header-top-ratio`, `--footer-bottom-ratio`) 기준
+    - `repeat`: 페이지 간 반복되는 짧은 문자열(`--repeat-min-pages`, `--repeat-max-chars`) 기준
+- 선택: 이미지 기반 OCR `--image-ocr-engine` + `--image-ocr-route`
+  - `none`(기본), `tesseract`, `paddleocr` (선택 엔진 미설치 시 OCR 스킵)
+  - `--image-ocr-route needs_ocr`(기본) 또는 `always` (페이지 OCR 라우팅 여부에 따라 image block bbox OCR 수행)
+  - `--image-ocr-dpi`, `--image-ocr-min-chars`로 품질/비용 조절
 - 오픈 이슈:
   - PaddleOCR 등 2차 OCR 엔진·이미지 표(`img2table`)는 미연동
   - 표·본문 중복 억제는 bbox 휴리스틱 수준
 - 다음 액션:
   - 실제 Architecture PDF로 라우팅 임계값(`--min-chars-ocr`) 튜닝
+  - 헤더/푸터 필터 파라미터(`position`/`repeat`) 문서별 튜닝
   - Stage 3과 표 블록 품질 공동 검증
 
 ## Technical Note

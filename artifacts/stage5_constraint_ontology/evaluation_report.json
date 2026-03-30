@@ -1,0 +1,99 @@
+{
+  "sections": {
+    "constraint_registry": {
+      "metrics": {
+        "true_positive_count": 2,
+        "false_positive_count": 0,
+        "false_negative_count": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0
+      },
+      "true_positives": [
+        "C_OPCODE_0000",
+        "C_SRC_0001"
+      ],
+      "false_positives": [],
+      "false_negatives": []
+    },
+    "mission_ontology_graph": {
+      "nodes": {
+        "metrics": {
+          "true_positive_count": 8,
+          "false_positive_count": 0,
+          "false_negative_count": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "true_positives": [
+          "Constraint:C_OPCODE_0000",
+          "Constraint:C_SRC_0001",
+          "DT:uint4",
+          "EU:EU0",
+          "Field:OPCODE",
+          "Field:SRC",
+          "IP:sample",
+          "Instr:42"
+        ],
+        "false_positives": [],
+        "false_negatives": []
+      },
+      "edges": {
+        "metrics": {
+          "true_positive_count": 8,
+          "false_positive_count": 0,
+          "false_negative_count": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "true_positives": [
+          [
+            "Constraint:C_OPCODE_0000",
+            "APPLIES_TO",
+            "Field:OPCODE"
+          ],
+          [
+            "Constraint:C_SRC_0001",
+            "APPLIES_TO",
+            "Field:SRC"
+          ],
+          [
+            "Field:OPCODE",
+            "HAS_DATATYPE",
+            "DT:uint4"
+          ],
+          [
+            "Field:SRC",
+            "HAS_DATATYPE",
+            "DT:uint4"
+          ],
+          [
+            "IP:sample",
+            "HAS_INSTRUCTION",
+            "Instr:42"
+          ],
+          [
+            "Instr:42",
+            "EXECUTES_ON",
+            "EU:EU0"
+          ],
+          [
+            "Instr:42",
+            "HAS_FIELD",
+            "Field:OPCODE"
+          ],
+          [
+            "Instr:42",
+            "HAS_FIELD",
+            "Field:SRC"
+          ]
+        ],
+        "false_positives": [],
+        "false_negatives": []
+      }
+    }
+  },
+  "ground_truth_path": "D:\\Users\\op21b\\NPU_AutoVerify\\artifacts\\_gt_stage5.json"
+}

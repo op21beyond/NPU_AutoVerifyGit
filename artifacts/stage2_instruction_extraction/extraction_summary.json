@@ -1,6 +1,13 @@
 {
-  "stage_run_id": "stage2_instruction_extraction-b6487f4cdd08",
+  "stage_run_id": "stage2_instruction_extraction-eb4aaf991f3b",
   "instruction_count": 1,
-  "page_blocks_path": "d:\\Users\\op21b\\NPU_AutoVerify\\artifacts\\_synth_page_blocks.jsonl",
+  "page_blocks_path": null,
+  "supplemental_text_corpus_path": null,
+  "extractor": null,
+  "catalog_source": "ground_truth",
+  "openai_model": null,
+  "openai_base_url": null,
+  "ground_truth_path": "artifacts\\_gt_catalog.json",
+  "ground_truth_as_catalog": true,
   "output_schema_version": "instruction_catalog@1"
 }

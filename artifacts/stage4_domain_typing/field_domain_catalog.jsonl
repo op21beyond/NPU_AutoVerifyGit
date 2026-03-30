@@ -1,0 +1,2 @@
+{"trace_id": "stage4_domain_typing-c33e55567980:domain:0", "field_name": "OPCODE", "allowed_value_form": "range", "allowed_values_or_range": "0..15", "source_refs": [{"page": 1}]}
+{"trace_id": "stage4_domain_typing-c33e55567980:domain:1", "field_name": "SRC", "allowed_value_form": "range", "allowed_values_or_range": "0..15", "source_refs": [{"page": 1}]}

@@ -7,3 +7,6 @@ pytesseract>=0.3.10
 
 # Stage 2 optional: --extractor openai (set OPENAI_API_KEY)
 openai>=1.40.0
+
+# Stage 1 optional: supplemental markdown corpus for Stage 2 recall boost
+pymupdf4llm>=0.0.17

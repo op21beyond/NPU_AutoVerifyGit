@@ -7,7 +7,7 @@ from typing import Any, Dict, List
 from src.common.contracts import write_json, write_jsonl
 from src.common.runtime import StageRun, artifact_path
 
-from src.stage1_ingestion.ingestion import PageMetrics, extract_page_blocks
+from src.stage1_ingestion.ingestion import PageMetrics, extract_page_blocks, extract_pymupdf4llm_corpus
 
 
 def _build_ocr_routing_payload(
@@ -53,6 +53,66 @@ def main() -> None:
         action="store_true",
         help="Run optional Tesseract full-page OCR on routed pages (requires tesseract on PATH)",
     )
+    parser.add_argument(
+        "--image-ocr-engine",
+        choices=("none", "tesseract", "paddleocr"),
+        default="none",
+        help="Run OCR for `image` blocks using selected engine (default: none).",
+    )
+    parser.add_argument(
+        "--image-ocr-route",
+        choices=("needs_ocr", "always"),
+        default="needs_ocr",
+        help="Run image OCR on pages flagged by OCR routing (`needs_ocr`) or always.",
+    )
+    parser.add_argument(
+        "--image-ocr-dpi",
+        type=int,
+        default=200,
+        help="DPI for rendering cropped image OCR (default: 200).",
+    )
+    parser.add_argument(
+        "--image-ocr-min-chars",
+        type=int,
+        default=5,
+        help="Min recognized characters to accept an image OCR result (default: 5).",
+    )
+    parser.add_argument(
+        "--header-footer-mode",
+        choices=("none", "position", "repeat"),
+        default="none",
+        help="Header/footer removal mode: none, position-based, or repeat-based",
+    )
+    parser.add_argument(
+        "--header-top-ratio",
+        type=float,
+        default=0.08,
+        help="Top area ratio used by --header-footer-mode position (default: 0.08)",
+    )
+    parser.add_argument(
+        "--footer-bottom-ratio",
+        type=float,
+        default=0.08,
+        help="Bottom area ratio used by --header-footer-mode position (default: 0.08)",
+    )
+    parser.add_argument(
+        "--repeat-min-pages",
+        type=int,
+        default=3,
+        help="Min distinct pages with repeated short text for --header-footer-mode repeat",
+    )
+    parser.add_argument(
+        "--repeat-max-chars",
+        type=int,
+        default=120,
+        help="Max raw text length considered as header/footer candidate for repeat mode",
+    )
+    parser.add_argument(
+        "--text-backend",
+        choices=("pymupdf", "pymupdf4llm", "hybrid"),
+        default="pymupdf",
+        help="Text extraction backend policy: pymupdf only, pymupdf4llm supplemental, or hybrid",
+    )
     args = parser.parse_args()
 
     pdf_path = Path(args.input_pdf)
@@ -65,6 +125,15 @@ def main() -> None:
         run,
         min_chars_for_no_ocr=args.min_chars_ocr,
         run_full_page_ocr=args.ocr_full_page,
+        image_ocr_engine=args.image_ocr_engine,
+        image_ocr_route=args.image_ocr_route,
+        image_ocr_dpi=args.image_ocr_dpi,
+        image_ocr_min_chars=args.image_ocr_min_chars,
+        header_footer_mode=args.header_footer_mode,
+        header_top_ratio=args.header_top_ratio,
+        footer_bottom_ratio=args.footer_bottom_ratio,
+        repeat_min_pages=args.repeat_min_pages,
+        repeat_max_chars=args.repeat_max_chars,
     )
 
     out = artifact_path("stage1_ingestion", "page_blocks.jsonl")
@@ -72,9 +141,16 @@ def main() -> None:
 
     parsing_report = {
         **summary,
+        "text_backend": args.text_backend,
         "ocr_candidate_pages_count": len([m for m in metrics_list if m.needs_ocr]),
         "output_schema_version": "page_blocks@1",
     }
+    if args.text_backend in ("pymupdf4llm", "hybrid"):
+        corpus = extract_pymupdf4llm_corpus(pdf_path)
+        corpus_path = artifact_path("stage1_ingestion", "pymupdf4llm_corpus.json")
+        write_json(corpus_path, corpus)
+        parsing_report["supplemental_text_corpus"] = str(corpus_path)
+
     write_json(artifact_path("stage1_ingestion", "parsing_report.json"), parsing_report)
     write_json(
         artifact_path("stage1_ingestion", "ocr_routing.json"),
