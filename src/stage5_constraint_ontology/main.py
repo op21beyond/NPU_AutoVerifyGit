@@ -24,12 +24,12 @@ def main() -> None:
         type=str,
         default=None,
         metavar="PATH",
-        help="Ground truth JSON (constraint_registry, mission_ontology_graph) for evaluation.",
+        help="Ground truth file (.json or .txt/.lst/.list) for evaluation.",
     )
     parser.add_argument(
         "--ground-truth-as-output",
         action="store_true",
-        help="Skip extraction and write stage5 artifacts directly from --ground-truth JSON.",
+        help="Skip extraction and write stage5 artifacts directly from --ground-truth.",
     )
     args = parser.parse_args()
 

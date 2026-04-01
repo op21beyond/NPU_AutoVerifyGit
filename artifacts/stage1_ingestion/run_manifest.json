@@ -1,6 +1,6 @@
 {
   "stage_name": "stage1_ingestion",
-  "stage_run_id": "stage1_ingestion-47d3216e5bd6",
-  "started_at": "2026-03-30T14:47:27.199643+00:00",
-  "ended_at": "2026-03-30T14:47:27.207525+00:00"
+  "stage_run_id": "stage1_ingestion-f47289f25e1e",
+  "started_at": "2026-04-01T14:52:29.327816+00:00",
+  "ended_at": "2026-04-01T14:52:29.338222+00:00"
 }

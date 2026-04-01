@@ -1,7 +1,8 @@
 {
-  "stage_run_id": "stage3_field_table_parsing-d0bada6afd30",
-  "field_row_count": 2,
-  "instruction_count_input": 1,
-  "ground_truth_as_output": false,
+  "stage_run_id": "stage3_field_table_parsing-91dd2a0c8410",
+  "field_row_count": 4,
+  "instruction_count_input": null,
+  "ground_truth_path": "D:\\Users\\op21b\\NPU_AutoVerify\\ground_truth_examples\\stage3_ground_truth.txt",
+  "ground_truth_as_output": true,
   "output_schema_version": "instruction_field_map@1"
 }

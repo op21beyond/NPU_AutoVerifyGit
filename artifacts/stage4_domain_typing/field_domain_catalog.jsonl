@@ -1,2 +1,2 @@
-{"trace_id": "stage4_domain_typing-c33e55567980:domain:0", "field_name": "OPCODE", "allowed_value_form": "range", "allowed_values_or_range": "0..15", "source_refs": [{"page": 1}]}
-{"trace_id": "stage4_domain_typing-c33e55567980:domain:1", "field_name": "SRC", "allowed_value_form": "range", "allowed_values_or_range": "0..15", "source_refs": [{"page": 1}]}
+{"field_name": "OPCODE", "allowed_value_form": "range", "allowed_values_or_range": "0..63", "trace_id": "stage4_domain_typing-7f47def7f4a0:domain:0", "source_refs": []}
+{"field_name": "SRC0", "allowed_value_form": "range", "allowed_values_or_range": "enum{TILE_A,TILE_B}", "trace_id": "stage4_domain_typing-7f47def7f4a0:domain:1", "source_refs": []}

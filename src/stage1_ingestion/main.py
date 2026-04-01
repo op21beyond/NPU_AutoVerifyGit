@@ -78,6 +78,41 @@ def main() -> None:
         help="Min recognized characters to accept an image OCR result (default: 5).",
     )
     parser.add_argument(
+        "--table-text-engine",
+        choices=("pymupdf", "pdflumber", "tesseract", "paddleocr"),
+        default="pymupdf",
+        help="Engine for table block text extraction (default: pymupdf).",
+    )
+    parser.add_argument(
+        "--table-ocr-route",
+        choices=("empty_only", "always"),
+        default="empty_only",
+        help="For table OCR engines, run OCR only when table text is empty/short or always.",
+    )
+    parser.add_argument(
+        "--table-ocr-dpi",
+        type=int,
+        default=200,
+        help="DPI for rendering table bbox OCR (default: 200).",
+    )
+    parser.add_argument(
+        "--table-ocr-min-chars",
+        type=int,
+        default=8,
+        help="Min recognized characters to accept table OCR result (default: 8).",
+    )
+    parser.add_argument(
+        "--paddle-device",
+        choices=("auto", "cpu", "gpu"),
+        default="auto",
+        help="PaddleOCR device policy: auto-detect GPU, or force cpu/gpu.",
+    )
+    parser.add_argument(
+        "--paddle-model-dir",
+        default="",
+        help="Optional PaddleOCR model root directory (expects det/rec/cls subdirs).",
+    )
+    parser.add_argument(
         "--header-footer-mode",
         choices=("none", "position", "repeat"),
         default="none",
@@ -129,6 +164,12 @@ def main() -> None:
         image_ocr_route=args.image_ocr_route,
         image_ocr_dpi=args.image_ocr_dpi,
         image_ocr_min_chars=args.image_ocr_min_chars,
+        table_text_engine=args.table_text_engine,
+        table_ocr_route=args.table_ocr_route,
+        table_ocr_dpi=args.table_ocr_dpi,
+        table_ocr_min_chars=args.table_ocr_min_chars,
+        paddle_device=args.paddle_device,
+        paddle_model_dir=args.paddle_model_dir,
         header_footer_mode=args.header_footer_mode,
         header_top_ratio=args.header_top_ratio,
         footer_bottom_ratio=args.footer_bottom_ratio,

@@ -1,2 +1,2 @@
-{"trace_id": "stage4_domain_typing-c33e55567980:dtype:0", "instruction_name": "CONV", "field_name": "OPCODE", "data_type_raw": "uint4", "data_type_ref": "uint4", "source_refs": [{"page": 1}]}
-{"trace_id": "stage4_domain_typing-c33e55567980:dtype:1", "instruction_name": "CONV", "field_name": "SRC", "data_type_raw": "uint4", "data_type_ref": "uint4", "source_refs": [{"page": 1}]}
+{"instruction_name": "ADD", "field_name": "OPCODE", "data_type_ref": "uint6", "trace_id": "stage4_domain_typing-7f47def7f4a0:dtype:0", "source_refs": []}
+{"field_name": "SRC0", "data_type_ref": "NPU_TILE_FMT", "trace_id": "stage4_domain_typing-7f47def7f4a0:dtype:1", "source_refs": []}

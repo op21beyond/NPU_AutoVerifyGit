@@ -1,0 +1,8 @@
+﻿# Stage3 ground truth (instruction field map)
+# Format: INSTRUCTION FIELD [BIT_RANGE]
+ADD OPCODE 31:26
+ADD DST 25:21
+MUL SRC0 20:16
+MUL SRC1
+
+# BIT_RANGE is optional

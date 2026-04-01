@@ -18,18 +18,97 @@ def _norm_type_id(s: str) -> str:
     return (s or "").strip()
 
 
+def _split_parts(line: str) -> List[str]:
+    if "|" in line:
+        return [p.strip() for p in line.split("|")]
+    return re.split(r"\s+", line.strip())
+
+
 def load_stage4_ground_truth(path: Path) -> Dict[str, Any]:
     """
-    Ground-truth file (JSON) with optional keys:
+    Ground-truth file with optional keys:
     - datatype_registry: list of objects (type_id required for eval)
     - field_datatype_catalog: list (instruction_name, field_name, data_type_ref)
     - field_domain_catalog: list (field_name, allowed_value_form, allowed_values_or_range)
+
+    Supported:
+    - .json: {"datatype_registry": [...], "field_datatype_catalog": [...], "field_domain_catalog": [...]}
+    - .txt/.lst/.list: line-based compact format (partial fields allowed)
+      * TYPE|type_id[|category]
+      * DTYPE|instruction_name|field_name|data_type_ref
+      * DTYPE|field_name|data_type_ref
+      * DOMAIN|field_name|allowed_value_form|allowed_values_or_range
+      * DOMAIN|field_name|allowed_values_or_range
     """
     if not path.is_file():
         raise FileNotFoundError(f"Ground truth file not found: {path}")
-    if path.suffix.lower() != ".json":
-        raise ValueError("Stage4 ground truth must be a .json file with datatype_registry / field_datatype_catalog / field_domain_catalog arrays")
-    data = json.loads(path.read_text(encoding="utf-8-sig"))
+    suffix = path.suffix.lower()
+    text = path.read_text(encoding="utf-8-sig")
+
+    if suffix in (".txt", ".lst", ".list"):
+        reg: List[Dict[str, Any]] = []
+        dcat: List[Dict[str, Any]] = []
+        dom: List[Dict[str, Any]] = []
+        for line in text.splitlines():
+            raw = line.strip()
+            if not raw or raw.startswith("#"):
+                continue
+            parts = _split_parts(raw)
+            if not parts:
+                continue
+            tag = (parts[0] or "").strip().upper().rstrip(":")
+            vals = parts[1:]
+            if tag == "TYPE":
+                if not vals:
+                    continue
+                type_id = _norm_type_id(vals[0])
+                if not type_id:
+                    continue
+                category = str(vals[1]).strip() if len(vals) >= 2 else "unknown"
+                reg.append({"type_id": type_id, "type_name_raw": type_id, "category": category})
+            elif tag == "DTYPE":
+                if len(vals) >= 3:
+                    dcat.append(
+                        {
+                            "instruction_name": str(vals[0]).strip().upper(),
+                            "field_name": str(vals[1]).strip(),
+                            "data_type_ref": _norm_type_id(vals[2]),
+                        }
+                    )
+                elif len(vals) >= 2:
+                    dcat.append(
+                        {
+                            "field_name": str(vals[0]).strip(),
+                            "data_type_ref": _norm_type_id(vals[1]),
+                        }
+                    )
+            elif tag == "DOMAIN":
+                if len(vals) >= 3:
+                    dom.append(
+                        {
+                            "field_name": str(vals[0]).strip(),
+                            "allowed_value_form": str(vals[1]).strip(),
+                            "allowed_values_or_range": str(vals[2]).strip(),
+                        }
+                    )
+                elif len(vals) >= 2:
+                    dom.append(
+                        {
+                            "field_name": str(vals[0]).strip(),
+                            "allowed_value_form": "range",
+                            "allowed_values_or_range": str(vals[1]).strip(),
+                        }
+                    )
+        return {
+            "datatype_registry": reg,
+            "field_datatype_catalog": dcat,
+            "field_domain_catalog": dom,
+        }
+
+    if suffix != ".json":
+        raise ValueError("Stage4 ground truth must be .json or .txt/.lst/.list")
+
+    data = json.loads(text)
     if not isinstance(data, dict):
         raise ValueError("Stage4 GT .json must be an object")
     out: Dict[str, Any] = {}

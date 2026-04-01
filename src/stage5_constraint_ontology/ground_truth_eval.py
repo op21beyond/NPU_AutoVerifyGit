@@ -1,23 +1,80 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Set, Tuple
 
 from src.common.runtime import StageRun
 
 
+def _split_parts(line: str) -> List[str]:
+    if "|" in line:
+        return [p.strip() for p in line.split("|")]
+    return re.split(r"\s+", line.strip())
+
+
 def load_stage5_ground_truth(path: Path) -> Dict[str, Any]:
     """
-    JSON object with:
+    Supported:
+    - .json object with:
     - constraint_registry: array
     - mission_ontology_graph: { "nodes": [...], "edges": [...] }
+    - .txt/.lst/.list line-based compact format:
+      * CONSTRAINT|constraint_id
+      * NODE|node_id
+      * EDGE|from|rel|to
     """
     if not path.is_file():
         raise FileNotFoundError(f"Ground truth file not found: {path}")
-    if path.suffix.lower() != ".json":
-        raise ValueError("Stage5 ground truth must be a .json file")
-    data = json.loads(path.read_text(encoding="utf-8-sig"))
+    suffix = path.suffix.lower()
+    text = path.read_text(encoding="utf-8-sig")
+
+    if suffix in (".txt", ".lst", ".list"):
+        constraints: List[Dict[str, Any]] = []
+        nodes: List[Dict[str, Any]] = []
+        edges: List[Dict[str, Any]] = []
+        for line in text.splitlines():
+            raw = line.strip()
+            if not raw or raw.startswith("#"):
+                continue
+            parts = _split_parts(raw)
+            if not parts:
+                continue
+            tag = parts[0].strip().upper().rstrip(":")
+            vals = parts[1:]
+            if tag == "CONSTRAINT":
+                if not vals:
+                    continue
+                cid = str(vals[0]).strip()
+                if not cid:
+                    continue
+                constraints.append({"constraint_id": cid})
+            elif tag == "NODE":
+                if not vals:
+                    continue
+                nid = str(vals[0]).strip()
+                if not nid:
+                    continue
+                nodes.append({"id": nid})
+            elif tag == "EDGE":
+                if len(vals) < 3:
+                    continue
+                frm = str(vals[0]).strip()
+                rel = str(vals[1]).strip()
+                to = str(vals[2]).strip()
+                if not (frm and rel and to):
+                    continue
+                edges.append({"from": frm, "rel": rel, "to": to})
+        return {
+            "constraint_registry": constraints,
+            "mission_ontology_graph": {"nodes": nodes, "edges": edges},
+        }
+
+    if suffix != ".json":
+        raise ValueError("Stage5 ground truth must be .json or .txt/.lst/.list")
+
+    data = json.loads(text)
     if not isinstance(data, dict):
         raise ValueError("Stage5 GT .json must be an object")
     cr = data.get("constraint_registry")

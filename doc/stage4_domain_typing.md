@@ -16,8 +16,12 @@
 - 상태: Implemented (휴리스틱: `instruction_field_map`의 `bit_range` 폭으로 `uintN` 타입·도메인 추론)
 - 구현률: ~55%
 - Ground truth 옵션:
-  - `--ground-truth-as-output` + `--ground-truth PATH` — GT JSON에서 `datatype_registry` / `field_datatype_catalog` / `field_domain_catalog` 배열을 읽어 산출물 직접 기록
+  - `--ground-truth-as-output` + `--ground-truth PATH` — GT(`.json` 또는 `.txt/.lst/.list`)에서 `datatype_registry` / `field_datatype_catalog` / `field_domain_catalog`를 읽어 산출물 직접 기록
   - `--ground-truth`만 — 추출 결과와 GT를 비교해 `evaluation_report.json` (섹션별 type_id / 필드·타입 키 / 도메인 키)
+  - 예시 파일: `ground_truth_examples/stage4_ground_truth.txt`
+    - 평가: `python -m src.stage4_domain_typing.main --ground-truth ground_truth_examples/stage4_ground_truth.txt`
+    - 정답 직접 출력: `python -m src.stage4_domain_typing.main --ground-truth-as-output --ground-truth ground_truth_examples/stage4_ground_truth.txt`
+  - 텍스트 GT는 `TYPE|...`, `DTYPE|...`, `DOMAIN|...` 라인 기반이며 일부 필드 생략 입력 허용
 - 오픈 이슈:
   - TRM 본문에서 타입 정의·값 생성 규칙 자동 추출 미구현
   - 동일 타입 명칭의 동의어·별칭 병합 규칙 미정

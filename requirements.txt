@@ -4,6 +4,14 @@ pymupdf>=1.24.0
 # Optional: full-page OCR for routed pages (requires Tesseract on PATH)
 Pillow>=10.0.0
 pytesseract>=0.3.10
+# Optional: table extraction backend for --table-text-engine pdflumber
+pdfplumber>=0.11.0
+
+# Optional: PaddleOCR image/table OCR backend
+# Install one Paddle runtime matching your environment:
+# - CPU: pip install paddlepaddle
+# - GPU: pip install paddlepaddle-gpu
+paddleocr>=2.7.0
 
 # Stage 2 optional: --extractor openai (set OPENAI_API_KEY)
 openai>=1.40.0

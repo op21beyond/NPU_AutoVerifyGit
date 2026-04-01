@@ -18,6 +18,10 @@
 - Ground truth 옵션:
   - `--ground-truth-as-output` + `--ground-truth`로 GT 기반 `instruction_field_map` 직접 생성
   - `--ground-truth`만 주면 추출 결과를 GT로 성능평가(`evaluation_report.json`)
+  - 예시 파일: `ground_truth_examples/stage3_ground_truth.txt`
+    - 평가: `python -m src.stage3_field_table_parsing.main --ground-truth ground_truth_examples/stage3_ground_truth.txt`
+    - 정답 직접 출력: `python -m src.stage3_field_table_parsing.main --ground-truth-as-output --ground-truth ground_truth_examples/stage3_ground_truth.txt`
+  - 텍스트 GT는 `INSTR FIELD [BIT_RANGE]` 형식이며 `BIT_RANGE`는 생략 가능(부분 항목 허용)
 - 다음 액션:
   - OCR 표 구조와 행 매핑
   - 실 PDF로 열 인덱스·헤더 튜닝

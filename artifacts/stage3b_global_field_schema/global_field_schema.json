@@ -1,16 +1,14 @@
 {
   "stage_name": "stage3b_global_field_schema",
-  "stage_run_id": "stage3b_global_field_schema-c3309e9d55b3",
+  "stage_run_id": "stage3b_global_field_schema-4062b6be2fef",
   "canonical_field_names": [
+    "DST",
+    "IMM",
     "OPCODE",
-    "SRC"
+    "SRC0",
+    "SRC1"
   ],
-  "field_count_per_instruction": {
-    "CONV": [
-      "OPCODE",
-      "SRC"
-    ]
-  },
+  "field_count_per_instruction": {},
   "alias_catalog": "field_alias_map.jsonl",
   "output_schema_version": "global_field_schema@1"
 }

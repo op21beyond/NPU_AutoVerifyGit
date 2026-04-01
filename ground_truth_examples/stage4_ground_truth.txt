@@ -1,0 +1,14 @@
+﻿# Stage4 compact text ground truth
+# TYPE|type_id|category(optional)
+TYPE|uint6|software_primitive
+TYPE|NPU_TILE_FMT|ip_architecture
+
+# DTYPE|instruction_name|field_name|data_type_ref
+# or DTYPE|field_name|data_type_ref  (instruction omitted)
+DTYPE|ADD|OPCODE|uint6
+DTYPE|SRC0|NPU_TILE_FMT
+
+# DOMAIN|field_name|allowed_value_form|allowed_values_or_range
+# or DOMAIN|field_name|allowed_values_or_range (form defaults to range)
+DOMAIN|OPCODE|range|0..63
+DOMAIN|SRC0|enum{TILE_A,TILE_B}

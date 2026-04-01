@@ -16,6 +16,9 @@
 - 평가: `--ground-truth PATH` — 정답 instruction 목록 파일. 추출 후 `artifacts/stage2_instruction_extraction/evaluation_report.json`에 precision/recall/F1·FP/FN 목록·(선택) opcode_value 일치 수 기록. 형식: `.txt`는 한 줄에 하나( `#` 주석 가능), `.json`은 `["A","B"]` 또는 `[{"instruction_name":"CONV","opcode_value":42}]`, `.jsonl`은 객체/문자열 한 줄씩
 - 보강 입력: `--supplemental-text-corpus PATH` — Stage1 `pymupdf4llm_corpus.json`을 읽어 pseudo block으로 합쳐 regex 추출 recall을 보강. 미지정 시 기본 경로(`artifacts/stage1_ingestion/pymupdf4llm_corpus.json`) 자동 탐지(해제: `--disable-default-supplemental-text`)
 - 정답 직접 출력: `--ground-truth-as-catalog` + `--ground-truth PATH` — regex/LLM 추출을 건너뛰고 정답 파일만으로 `instruction_catalog.jsonl` 생성(JSON 객체에 `opcode_raw`/`opcode_value`, 선택 `execution_unit`/`instruction_kind`/`aliases` 지원). 이 모드에서는 `--ground-truth` 성능 평가 리포트를 생략(출력이 정답과 동일)
+- 예시 파일: `ground_truth_examples/stage2_ground_truth.txt`
+  - 평가: `python -m src.stage2_instruction_extraction.main --ground-truth ground_truth_examples/stage2_ground_truth.txt`
+  - 정답 직접 출력: `python -m src.stage2_instruction_extraction.main --ground-truth-as-catalog --ground-truth ground_truth_examples/stage2_ground_truth.txt`
 - 오픈 이슈:
   - LLM low-confidence 보정 게이트 미구현
   - execution_unit은 히트 주변 스니펫 기준이라 같은 블록 원문 전체 맥락 미반영 가능

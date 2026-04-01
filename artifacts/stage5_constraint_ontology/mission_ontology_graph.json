@@ -1,92 +1,28 @@
 {
   "nodes": [
     {
-      "type": "IP",
-      "id": "IP:sample",
-      "ip_name": "sample",
-      "ip_type": "npu",
-      "ip_version": "v0"
+      "id": "IP:sample"
     },
     {
-      "type": "ExecutionUnit",
-      "id": "EU:EU0",
-      "name": "EU0"
+      "id": "Instr:ADD"
     },
     {
-      "type": "Instruction",
-      "id": "Instr:42",
-      "instruction_name": "CONV",
-      "instruction_kind": "micro",
-      "opcode_raw": "0x2A",
-      "opcode_radix": "hex",
-      "opcode_value": 42
+      "id": "Field:OPCODE"
     },
     {
-      "type": "Field",
-      "id": "Field:OPCODE",
-      "name": "OPCODE"
-    },
-    {
-      "type": "Field",
-      "id": "Field:SRC",
-      "name": "SRC"
-    },
-    {
-      "type": "DataType",
-      "id": "DT:uint4",
-      "type_id": "uint4"
-    },
-    {
-      "type": "Constraint",
-      "id": "Constraint:C_OPCODE_0000",
-      "constraint_id": "C_OPCODE_0000"
-    },
-    {
-      "type": "Constraint",
-      "id": "Constraint:C_SRC_0001",
-      "constraint_id": "C_SRC_0001"
+      "id": "Constraint:C_OPCODE_RANGE"
     }
   ],
   "edges": [
     {
-      "from": "Constraint:C_OPCODE_0000",
-      "rel": "APPLIES_TO",
-      "to": "Field:OPCODE"
-    },
-    {
-      "from": "Constraint:C_SRC_0001",
-      "rel": "APPLIES_TO",
-      "to": "Field:SRC"
-    },
-    {
-      "from": "Field:OPCODE",
-      "rel": "HAS_DATATYPE",
-      "to": "DT:uint4"
-    },
-    {
-      "from": "Field:SRC",
-      "rel": "HAS_DATATYPE",
-      "to": "DT:uint4"
-    },
-    {
       "from": "IP:sample",
       "rel": "HAS_INSTRUCTION",
-      "to": "Instr:42"
+      "to": "Instr:ADD"
     },
     {
-      "from": "Instr:42",
-      "rel": "EXECUTES_ON",
-      "to": "EU:EU0"
-    },
-    {
-      "from": "Instr:42",
-      "rel": "HAS_FIELD",
+      "from": "Constraint:C_OPCODE_RANGE",
+      "rel": "APPLIES_TO",
       "to": "Field:OPCODE"
-    },
-    {
-      "from": "Instr:42",
-      "rel": "HAS_FIELD",
-      "to": "Field:SRC"
     }
   ]
 }

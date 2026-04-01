@@ -1,0 +1,7 @@
+﻿# Stage2 ground truth (instruction list)
+# one instruction per line is enough
+ADD
+MUL
+LOAD
+
+# optional richer format can be JSON/JSONL in stage2

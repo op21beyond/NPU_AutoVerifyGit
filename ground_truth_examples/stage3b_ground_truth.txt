@@ -1,0 +1,6 @@
+﻿# Stage3b ground truth (canonical field names)
+OPCODE
+DST
+SRC0
+SRC1
+IMM

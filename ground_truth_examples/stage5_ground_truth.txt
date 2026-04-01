@@ -1,0 +1,14 @@
+﻿# Stage5 compact text ground truth
+# CONSTRAINT|constraint_id
+CONSTRAINT|C_OPCODE_RANGE
+CONSTRAINT|C_SRC0_TILE_FMT
+
+# NODE|node_id
+NODE|IP:sample
+NODE|Instr:ADD
+NODE|Field:OPCODE
+NODE|Constraint:C_OPCODE_RANGE
+
+# EDGE|from|rel|to
+EDGE|IP:sample|HAS_INSTRUCTION|Instr:ADD
+EDGE|Constraint:C_OPCODE_RANGE|APPLIES_TO|Field:OPCODE

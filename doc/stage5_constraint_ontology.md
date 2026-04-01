@@ -18,8 +18,12 @@
 - 상태: Implemented (`field_domain_catalog` 기반 제약 행 + `instruction_catalog`·타입·필드 연결 온톨로지)
 - 구현률: ~45%
 - Ground truth 옵션:
-  - `--ground-truth-as-output` + `--ground-truth PATH` — GT JSON에서 `constraint_registry`·`mission_ontology_graph` 직접 기록
+  - `--ground-truth-as-output` + `--ground-truth PATH` — GT(`.json` 또는 `.txt/.lst/.list`)에서 `constraint_registry`·`mission_ontology_graph` 직접 기록
   - `--ground-truth`만 — `constraint_id` 집합 및 온톨로지 `nodes(id)` / `edges(from,rel,to)` 기준으로 `evaluation_report.json`
+  - 예시 파일: `ground_truth_examples/stage5_ground_truth.txt`
+    - 평가: `python -m src.stage5_constraint_ontology.main --ground-truth ground_truth_examples/stage5_ground_truth.txt`
+    - 정답 직접 출력: `python -m src.stage5_constraint_ontology.main --ground-truth-as-output --ground-truth ground_truth_examples/stage5_ground_truth.txt`
+  - 텍스트 GT는 `CONSTRAINT|...`, `NODE|...`, `EDGE|from|rel|to` 라인 기반이며 부분 항목만 작성 가능
 - 오픈 이슈:
   - 제약 후보 수집/클러스터링 미구현
   - 온톨로지 그래프는 seed 수준

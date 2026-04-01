@@ -9,6 +9,8 @@ import fitz
 
 from src.common.runtime import StageRun
 
+_PADDLE_OCR_CACHE: Dict[Tuple[bool, str], Any] = {}
+
 
 def _trace_id(run: StageRun, page: int, block_index: int) -> str:
     return f"{run.stage_run_id}:{page}:{block_index}"
@@ -106,20 +108,32 @@ def _evaluate_ocr_routing(m: PageMetrics, min_chars: int, image_weight: int) -> 
 
 
 def _extract_tables(
+    pdf_path: Path,
     page: fitz.Page,
     page_number: int,
     run: StageRun,
     document_id: str,
     block_counter: int,
     table_bboxes: List[Tuple[float, float, float, float]],
-) -> Tuple[List[Dict[str, Any]], int]:
+    *,
+    table_text_engine: str = "pymupdf",
+    table_ocr_route: str = "empty_only",
+    table_ocr_dpi: int = 200,
+    table_ocr_min_chars: int = 8,
+    paddle_device: str = "auto",
+    paddle_model_dir: str = "",
+) -> Tuple[List[Dict[str, Any]], int, int, int]:
     rows: List[Dict[str, Any]] = []
+    table_ocr_attempted = 0
+    table_ocr_success = 0
+    t_engine = (table_text_engine or "pymupdf").lower().strip()
+    ocr_route = (table_ocr_route or "empty_only").lower().strip()
     try:
         page_height = float(page.rect.height)
         finder = page.find_tables()
         tables = getattr(finder, "tables", None) or []
     except (AttributeError, RuntimeError):
-        return rows, block_counter
+        return rows, block_counter, table_ocr_attempted, table_ocr_success
 
     for tab in tables:
         bbox = tuple(float(x) for x in tab.bbox)
@@ -133,6 +147,30 @@ def _extract_tables(
             raw = "\n".join(lines)
         else:
             raw = ""
+        method = "pymupdf_find_tables"
+
+        if t_engine == "pdflumber":
+            pl_text = try_extract_table_text_pdfplumber(pdf_path, page_number, bbox)
+            if pl_text and pl_text.strip():
+                raw = pl_text.strip()
+                method = "pdflumber_table_extract"
+
+        if t_engine in ("tesseract", "paddleocr"):
+            run_ocr = ocr_route == "always" or (ocr_route == "empty_only" and len(raw.strip()) < table_ocr_min_chars)
+            if run_ocr:
+                table_ocr_attempted += 1
+                ocr_text = try_ocr_image_bbox(
+                    page,
+                    bbox,
+                    engine=t_engine,
+                    dpi=table_ocr_dpi,
+                    paddle_device=paddle_device,
+                    paddle_model_dir=paddle_model_dir,
+                )
+                if ocr_text and ocr_text.strip() and len(ocr_text.strip()) >= table_ocr_min_chars:
+                    raw = ocr_text.strip()
+                    method = f"table_ocr_{t_engine}"
+                    table_ocr_success += 1
         char_count = len(raw.strip())
         bid = f"p{page_number}_b{block_counter}"
         rows.append(
@@ -146,20 +184,20 @@ def _extract_tables(
                 "block_type": "table",
                 "bbox": list(bbox),
                 "raw_text": raw,
-                "extraction_method": "pymupdf_find_tables",
-                "confidence_score": _confidence_table(char_count),
+                "extraction_method": method,
+                "confidence_score": _confidence_ocr_image(raw) if method.startswith("table_ocr_") else _confidence_table(char_count),
                 "source_refs": [
                     {
                         "page": page_number,
                         "bbox": list(bbox),
-                        "method": "pymupdf_find_tables",
+                        "method": method,
                         "page_height": page_height,
                     }
                 ],
             }
         )
         block_counter += 1
-    return rows, block_counter
+    return rows, block_counter, table_ocr_attempted, table_ocr_success
 
 
 def _text_blocks_from_dict(
@@ -411,12 +449,75 @@ def _confidence_ocr_image(text: str) -> float:
     return round(min(0.9, 0.45 + 0.005 * len(t)), 4)
 
 
+def _resolve_paddle_use_gpu(paddle_device: str = "auto") -> bool:
+    pref = (paddle_device or "auto").lower().strip()
+    if pref == "cpu":
+        return False
+    try:
+        import paddle
+    except ImportError:
+        return False
+    try:
+        compiled_cuda = bool(paddle.device.is_compiled_with_cuda())
+        gpu_count = int(paddle.device.cuda.device_count()) if compiled_cuda else 0
+        if pref == "gpu":
+            return compiled_cuda and gpu_count > 0
+        return compiled_cuda and gpu_count > 0
+    except Exception:
+        return False
+
+
+def _build_paddle_model_dirs(model_root: str) -> Dict[str, str]:
+    root = (model_root or "").strip()
+    if not root:
+        return {}
+    p = Path(root)
+    if not p.exists():
+        return {}
+    dirs: Dict[str, str] = {}
+    det = p / "det"
+    rec = p / "rec"
+    cls = p / "cls"
+    if det.is_dir():
+        dirs["det_model_dir"] = str(det)
+    if rec.is_dir():
+        dirs["rec_model_dir"] = str(rec)
+    if cls.is_dir():
+        dirs["cls_model_dir"] = str(cls)
+    return dirs
+
+
+def _get_paddle_ocr_instance(use_gpu: bool, model_root: str) -> Optional[Any]:
+    key = (use_gpu, (model_root or "").strip())
+    if key in _PADDLE_OCR_CACHE:
+        return _PADDLE_OCR_CACHE[key]
+    try:
+        from paddleocr import PaddleOCR
+    except ImportError:
+        return None
+    kwargs: Dict[str, Any] = {
+        "use_angle_cls": True,
+        "lang": "en",
+        "show_log": False,
+        "use_gpu": use_gpu,
+    }
+    kwargs.update(_build_paddle_model_dirs(model_root))
+    try:
+        ocr = PaddleOCR(**kwargs)
+    except Exception:
+        return None
+    _PADDLE_OCR_CACHE[key] = ocr
+    return ocr
+
+
 def try_ocr_image_bbox(
     page: fitz.Page,
     bbox: Tuple[float, float, float, float],
     *,
     engine: str = "tesseract",
     dpi: int = 200,
+    paddle_device: str = "auto",
+    paddle_model_dir: str = "",
 ) -> Optional[str]:
     """
     OCR text from a page region cropped by `bbox`.
@@ -464,10 +565,12 @@ def try_ocr_image_bbox(
         if eng == "paddleocr":
             try:
                 import numpy as np
-                from paddleocr import PaddleOCR
             except ImportError:
                 return None
-            ocr = PaddleOCR(use_angle_cls=True, lang="en", show_log=False)
+            use_gpu = _resolve_paddle_use_gpu(paddle_device)
+            ocr = _get_paddle_ocr_instance(use_gpu, paddle_model_dir)
+            if ocr is None:
+                return None
             arr = np.array(img)
             result = ocr.ocr(arr, cls=True)
             lines: List[str] = []
@@ -480,6 +583,34 @@ def try_ocr_image_bbox(
             return "\n".join(lines) if lines else None
 
         return None
+    except Exception:
+        return None
+
+
+def try_extract_table_text_pdfplumber(
+    pdf_path: Path,
+    page_number: int,
+    bbox: Tuple[float, float, float, float],
+) -> Optional[str]:
+    """Extract table text from a bbox using pdfplumber (optional dependency)."""
+    try:
+        import pdfplumber
+    except ImportError:
+        return None
+    try:
+        with pdfplumber.open(str(pdf_path)) as pdf:
+            if page_number < 1 or page_number > len(pdf.pages):
+                return None
+            p = pdf.pages[page_number - 1]
+            x0, y0, x1, y1 = [float(v) for v in bbox]
+            crop = p.crop((x0, y0, x1, y1))
+            tables = crop.extract_tables()
+            if not tables:
+                return None
+            table = tables[0] or []
+            lines = ["\t".join((cell or "").strip() for cell in row) for row in table if row]
+            txt = "\n".join(lines).strip()
+            return txt or None
     except Exception:
         return None
 
@@ -532,6 +663,12 @@ def extract_page_blocks(
     image_ocr_route: str = "needs_ocr",
     image_ocr_dpi: int = 200,
     image_ocr_min_chars: int = 5,
+    table_text_engine: str = "pymupdf",
+    table_ocr_route: str = "empty_only",
+    table_ocr_dpi: int = 200,
+    table_ocr_min_chars: int = 8,
+    paddle_device: str = "auto",
+    paddle_model_dir: str = "",
     header_footer_mode: str = "none",
     header_top_ratio: float = 0.08,
     footer_bottom_ratio: float = 0.08,
@@ -543,6 +680,8 @@ def extract_page_blocks(
     metrics_list: List[PageMetrics] = []
     image_ocr_attempted_total = 0
     image_ocr_success_total = 0
+    table_ocr_attempted_total = 0
+    table_ocr_success_total = 0
 
     doc = fitz.open(pdf_path)
     try:
@@ -555,9 +694,23 @@ def extract_page_blocks(
             table_bboxes: List[Tuple[float, float, float, float]] = []
             page_char_count = [0]
 
-            table_rows, block_counter = _extract_tables(
-                page, page_number, run, document_id, block_counter, table_bboxes
+            table_rows, block_counter, table_ocr_attempted, table_ocr_success = _extract_tables(
+                pdf_path,
+                page,
+                page_number,
+                run,
+                document_id,
+                block_counter,
+                table_bboxes,
+                table_text_engine=table_text_engine,
+                table_ocr_route=table_ocr_route,
+                table_ocr_dpi=table_ocr_dpi,
+                table_ocr_min_chars=table_ocr_min_chars,
+                paddle_device=paddle_device,
+                paddle_model_dir=paddle_model_dir,
             )
+            table_ocr_attempted_total += table_ocr_attempted
+            table_ocr_success_total += table_ocr_success
             text_img_rows, block_counter = _text_blocks_from_dict(
                 page, page_number, run, document_id, block_counter, table_bboxes, page_char_count
             )
@@ -598,6 +751,8 @@ def extract_page_blocks(
                         bbox_t,
                         engine=image_ocr_engine,
                         dpi=image_ocr_dpi,
+                        paddle_device=paddle_device,
+                        paddle_model_dir=paddle_model_dir,
                     )
                     if ocr_text and ocr_text.strip() and len(ocr_text.strip()) >= image_ocr_min_chars:
                         txt = ocr_text.strip()
@@ -689,6 +844,15 @@ def extract_page_blocks(
             "image_ocr_route": image_ocr_route,
             "image_ocr_attempted": image_ocr_attempted_total,
             "image_ocr_success": image_ocr_success_total,
+            "table_text_engine": table_text_engine,
+            "table_ocr_route": table_ocr_route,
+            "table_ocr_attempted": table_ocr_attempted_total,
+            "table_ocr_success": table_ocr_success_total,
+            "paddle_device": paddle_device,
+            "paddle_use_gpu": _resolve_paddle_use_gpu(paddle_device)
+            if (image_ocr_engine == "paddleocr" or table_text_engine == "paddleocr")
+            else None,
+            "paddle_model_dir": (paddle_model_dir or "").strip() or None,
         }
     finally:
         doc.close()

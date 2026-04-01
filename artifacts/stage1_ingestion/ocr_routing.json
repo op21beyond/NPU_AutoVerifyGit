@@ -1,6 +1,6 @@
 {
   "stage_name": "stage1_ingestion",
-  "stage_run_id": "stage1_ingestion-47d3216e5bd6",
+  "stage_run_id": "stage1_ingestion-f47289f25e1e",
   "ocr_candidate_pages": [
     1
   ],
@@ -33,10 +33,17 @@
       "removed_equation_count": 0,
       "removed_pages": []
     },
-    "image_ocr_engine": "tesseract",
-    "image_ocr_route": "always",
+    "image_ocr_engine": "none",
+    "image_ocr_route": "needs_ocr",
     "image_ocr_attempted": 0,
     "image_ocr_success": 0,
+    "table_text_engine": "paddleocr",
+    "table_ocr_route": "empty_only",
+    "table_ocr_attempted": 0,
+    "table_ocr_success": 0,
+    "paddle_device": "auto",
+    "paddle_use_gpu": false,
+    "paddle_model_dir": null,
     "text_backend": "pymupdf",
     "ocr_candidate_pages_count": 1,
     "output_schema_version": "page_blocks@1"
