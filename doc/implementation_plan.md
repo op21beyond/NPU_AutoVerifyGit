@@ -78,9 +78,11 @@ flowchart TD
 - PDF 페이지 단위 추출 및 텍스트 레이어 유무 판별
 - 페이지 내 블록 분리:
   - 본문, 표, 그림(삽입 이미지), 수식 영역
+- **표 bbox 후처리(기본 ON)**: `find_tables()` 조각을 겹침·수직 인접 기준으로 병합 후 추출; 선택적으로 페이지 가로로 bbox 확장. 비교용 `--table-merge-bypass` 등 — 상세는 [`doc/stage1_ingestion.md`](stage1_ingestion.md).
+- **본문 텍스트 상·아래첨자(기본 ON)**: `get_text("dict")` 스팬 메타데이터로 `<sup>`/`<sub>` 태그 삽입; 비교용 `--text-span-script-bypass`.
 - OCR 필요 페이지 자동 라우팅
 - 출력:
-  - `page_blocks` (block_type, block_id, page, bbox, raw_text, confidence; 선택: `relationships`)
+  - `page_blocks` (block_type, block_id, page, bbox, raw_text, confidence, `extraction_method`; 선택: `relationships`)
 
 ## Step 2. Instruction Candidate Extraction
 - 명령어 패턴 사전 + LLM tool call로 명령어명 후보 추출

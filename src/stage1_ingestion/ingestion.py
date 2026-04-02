@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import importlib.metadata
 import re
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
@@ -8,8 +10,21 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 import fitz
 
 from src.common.runtime import StageRun
+from src.stage1_ingestion.table_merge import expand_bbox_to_page_width, merge_table_bboxes
+from src.stage1_ingestion.text_span_scripts import merge_lines_with_span_scripts
 
-_PADDLE_OCR_CACHE: Dict[Tuple[bool, str], Any] = {}
+_LOGGED_IMPORT_MODULES: Set[str] = set()
+_PADDLE_OCR_CACHE: Dict[Tuple[Any, ...], Any] = {}
+
+
+def _log_except(func_name: str, e: BaseException) -> None:
+    print(f"[{func_name}] {type(e).__name__}: {e}", file=sys.stderr)
+
+
+def _log_import_once(module: str, e: BaseException) -> None:
+    if module not in _LOGGED_IMPORT_MODULES:
+        _LOGGED_IMPORT_MODULES.add(module)
+        _log_except(f"import:{module}", e)
 
 
 def _trace_id(run: StageRun, page: int, block_index: int) -> str:
@@ -107,6 +122,37 @@ def _evaluate_ocr_routing(m: PageMetrics, min_chars: int, image_weight: int) -> 
     m.ocr_reasons = reasons
 
 
+def _sort_tabs_reading_order(tabs: List[Any]) -> List[Any]:
+    def key(t: Any) -> Tuple[float, float]:
+        bb = tuple(float(x) for x in t.bbox)
+        return (bb[1], bb[0])
+
+    return sorted(tabs, key=key)
+
+
+def _concat_pymupdf_tab_extracts(tabs_sorted: List[Any]) -> str:
+    parts: List[str] = []
+    for tab in tabs_sorted:
+        try:
+            data = tab.extract()
+        except Exception as e:
+            _log_except("_extract_tables.tab.extract", e)
+            data = None
+        if data:
+            lines = ["\t".join(cell or "" for cell in row) for row in data]
+            parts.append("\n".join(lines))
+    return "\n\n".join(parts)
+
+
+def _table_clip_text_fallback(page: fitz.Page, bbox: Tuple[float, float, float, float]) -> str:
+    try:
+        r = fitz.Rect(bbox)
+        return page.get_text("text", clip=r) or ""
+    except Exception as e:
+        _log_except("_extract_tables.clip_text", e)
+        return ""
+
+
 def _extract_tables(
     pdf_path: Path,
     page: fitz.Page,
@@ -121,8 +167,17 @@ def _extract_tables(
     table_ocr_dpi: int = 200,
     table_ocr_min_chars: int = 8,
     paddle_device: str = "auto",
+    paddle_gpu_id: int = 0,
     paddle_model_dir: str = "",
-) -> Tuple[List[Dict[str, Any]], int, int, int]:
+    table_merge_bypass: bool = False,
+    table_merge_gap: float = 5.0,
+    table_merge_horizontal: bool = False,
+    table_merge_vertical_overlap: float = 0.5,
+    table_merge_horizontal_overlap: float = 0.5,
+    table_expand_x: bool = False,
+    table_page_margin_left: float = 0.0,
+    table_page_margin_right: float = 0.0,
+) -> Tuple[List[Dict[str, Any]], int, int, int, int]:
     rows: List[Dict[str, Any]] = []
     table_ocr_attempted = 0
     table_ocr_success = 0
@@ -130,25 +185,19 @@ def _extract_tables(
     ocr_route = (table_ocr_route or "empty_only").lower().strip()
     try:
         page_height = float(page.rect.height)
+        page_width = float(page.rect.width)
         finder = page.find_tables()
         tables = getattr(finder, "tables", None) or []
-    except (AttributeError, RuntimeError):
-        return rows, block_counter, table_ocr_attempted, table_ocr_success
+    except (AttributeError, RuntimeError) as e:
+        _log_except("_extract_tables.find_tables", e)
+        return rows, block_counter, table_ocr_attempted, table_ocr_success, 0
 
-    for tab in tables:
-        bbox = tuple(float(x) for x in tab.bbox)
-        table_bboxes.append(bbox)
-        try:
-            data = tab.extract()
-        except Exception:
-            data = None
-        if data:
-            lines = ["\t".join(cell or "" for cell in row) for row in data]
-            raw = "\n".join(lines)
-        else:
-            raw = ""
-        method = "pymupdf_find_tables"
+    detector_raw = len(tables)
+    if detector_raw == 0:
+        return rows, block_counter, table_ocr_attempted, table_ocr_success, 0
 
+    def _emit_one_row(bbox: Tuple[float, float, float, float], raw: str, method: str) -> None:
+        nonlocal block_counter, table_ocr_attempted, table_ocr_success
         if t_engine == "pdflumber":
             pl_text = try_extract_table_text_pdfplumber(pdf_path, page_number, bbox)
             if pl_text and pl_text.strip():
@@ -165,6 +214,7 @@ def _extract_tables(
                     engine=t_engine,
                     dpi=table_ocr_dpi,
                     paddle_device=paddle_device,
+                    paddle_gpu_id=paddle_gpu_id,
                     paddle_model_dir=paddle_model_dir,
                 )
                 if ocr_text and ocr_text.strip() and len(ocr_text.strip()) >= table_ocr_min_chars:
@@ -197,7 +247,49 @@ def _extract_tables(
             }
         )
         block_counter += 1
-    return rows, block_counter, table_ocr_attempted, table_ocr_success
+
+    if table_merge_bypass:
+        for tab in tables:
+            bbox = tuple(float(x) for x in tab.bbox)
+            if table_expand_x:
+                bbox = expand_bbox_to_page_width(bbox, page_width, table_page_margin_left, table_page_margin_right)
+            table_bboxes.append(bbox)
+            try:
+                data = tab.extract()
+            except Exception as e:
+                _log_except("_extract_tables.tab.extract", e)
+                data = None
+            if data:
+                lines = ["\t".join(cell or "" for cell in row) for row in data]
+                raw = "\n".join(lines)
+            else:
+                raw = ""
+            method = "pymupdf_find_tables"
+            if not raw.strip():
+                raw = _table_clip_text_fallback(page, bbox)
+            _emit_one_row(bbox, raw, method)
+        return rows, block_counter, table_ocr_attempted, table_ocr_success, detector_raw
+
+    bboxes = [tuple(float(x) for x in tab.bbox) for tab in tables]
+    merged_bboxes, groups = merge_table_bboxes(
+        bboxes,
+        gap_px=table_merge_gap,
+        vertical_min_width_overlap=table_merge_vertical_overlap,
+        horizontal_min_height_overlap=table_merge_horizontal_overlap,
+        horizontal_merge=table_merge_horizontal,
+    )
+    for mb, gidx in zip(merged_bboxes, groups):
+        group_tabs = _sort_tabs_reading_order([tables[i] for i in gidx])
+        bbox = mb
+        if table_expand_x:
+            bbox = expand_bbox_to_page_width(bbox, page_width, table_page_margin_left, table_page_margin_right)
+        table_bboxes.append(bbox)
+        raw = _concat_pymupdf_tab_extracts(group_tabs)
+        if not raw.strip():
+            raw = _table_clip_text_fallback(page, bbox)
+        method = "table_merged_pymupdf" if len(gidx) > 1 else "pymupdf_find_tables"
+        _emit_one_row(bbox, raw, method)
+    return rows, block_counter, table_ocr_attempted, table_ocr_success, detector_raw
 
 
 def _text_blocks_from_dict(
@@ -208,6 +300,8 @@ def _text_blocks_from_dict(
     block_counter: int,
     table_bboxes: List[Tuple[float, float, float, float]],
     page_char_count: List[int],
+    *,
+    text_span_script_bypass: bool = False,
 ) -> Tuple[List[Dict[str, Any]], int]:
     rows: List[Dict[str, Any]] = []
     td = page.get_text("dict")
@@ -226,18 +320,23 @@ def _text_blocks_from_dict(
 
         if btype == 0:
             lines = block.get("lines") or []
-            raw = _merge_span_text(lines)
+            if text_span_script_bypass:
+                raw = _merge_span_text(lines)
+                tex_method = "text_layer"
+            else:
+                raw = merge_lines_with_span_scripts(lines)
+                tex_method = "text_layer+span_scripts"
             char_count = len(raw)
             if table_bboxes and any(_center_inside(bbox, tb) and _rect_overlap(bbox, tb) > 0.35 for tb in table_bboxes):
                 continue
-            text_items.append((bbox, raw, char_count))
+            text_items.append((bbox, raw, char_count, tex_method))
         elif btype == 1:
             image_items.append((bbox,))
 
     total_text_chars = sum(t[2] for t in text_items)
     page_char_count[0] = total_text_chars
 
-    for bbox, raw, char_count in text_items:
+    for bbox, raw, char_count, tex_method in text_items:
         bid = f"p{page_number}_b{block_counter}"
         rows.append(
             {
@@ -250,13 +349,13 @@ def _text_blocks_from_dict(
                 "block_type": "text",
                 "bbox": list(bbox),
                 "raw_text": raw,
-                "extraction_method": "text_layer",
+                "extraction_method": tex_method,
                 "confidence_score": _confidence_text_layer(total_text_chars, char_count),
                 "source_refs": [
                     {
                         "page": page_number,
                         "bbox": list(bbox),
-                        "method": "text_layer",
+                        "method": tex_method,
                         "page_height": page_height,
                     }
                 ],
@@ -311,9 +410,10 @@ def _split_equation_tags(rows: List[Dict[str, Any]]) -> None:
         raw = row.get("raw_text") or ""
         if _maybe_equation_heuristic(raw):
             row["block_type"] = "equation"
-            row["extraction_method"] = "text_layer+heuristic_equation"
+            base_m = row.get("extraction_method") or "text_layer"
+            row["extraction_method"] = f"{base_m}+heuristic_equation"
             row["source_refs"] = [
-                {**(row["source_refs"][0] if row["source_refs"] else {}), "method": "text_layer+heuristic_equation"}
+                {**(row["source_refs"][0] if row["source_refs"] else {}), "method": row["extraction_method"]}
             ]
 
 
@@ -417,7 +517,8 @@ def try_full_page_ocr(page: fitz.Page, dpi: int = 150) -> Optional[str]:
     try:
         import pytesseract
         from PIL import Image
-    except ImportError:
+    except ImportError as e:
+        _log_import_once("pytesseract", e)
         return None
 
     try:
@@ -437,7 +538,8 @@ def try_full_page_ocr(page: fitz.Page, dpi: int = 150) -> Optional[str]:
         elif img.mode != "RGB":
             img = img.convert("RGB")
         return pytesseract.image_to_string(img)
-    except Exception:
+    except Exception as e:
+        _log_except("try_full_page_ocr", e)
         return None
 
 
@@ -449,13 +551,30 @@ def _confidence_ocr_image(text: str) -> float:
     return round(min(0.9, 0.45 + 0.005 * len(t)), 4)
 
 
+def _paddleocr_major_version() -> Optional[int]:
+    try:
+        v = importlib.metadata.version("paddleocr")
+    except importlib.metadata.PackageNotFoundError:
+        return None
+    except Exception as e:
+        _log_except("_paddleocr_major_version", e)
+        return None
+    try:
+        m = re.match(r"^(\d+)", v.strip())
+        return int(m.group(1)) if m else None
+    except Exception as e:
+        _log_except("_paddleocr_major_version.parse", e)
+        return None
+
+
 def _resolve_paddle_use_gpu(paddle_device: str = "auto") -> bool:
     pref = (paddle_device or "auto").lower().strip()
     if pref == "cpu":
         return False
     try:
         import paddle
-    except ImportError:
+    except ImportError as e:
+        _log_import_once("paddle", e)
         return False
     try:
         compiled_cuda = bool(paddle.device.is_compiled_with_cuda())
@@ -463,8 +582,22 @@ def _resolve_paddle_use_gpu(paddle_device: str = "auto") -> bool:
         if pref == "gpu":
             return compiled_cuda and gpu_count > 0
         return compiled_cuda and gpu_count > 0
-    except Exception:
+    except Exception as e:
+        _log_except("_resolve_paddle_use_gpu", e)
         return False
+
+
+def _resolve_paddle_device_string(paddle_device: str, gpu_id: int) -> str:
+    """PaddleOCR 3.x `device` argument: cpu, gpu, or gpu:N."""
+    pref = (paddle_device or "auto").lower().strip()
+    gid = max(0, int(gpu_id))
+    if pref == "cpu":
+        return "cpu"
+    if pref == "gpu":
+        return f"gpu:{gid}" if _resolve_paddle_use_gpu("gpu") else "cpu"
+    if pref == "auto":
+        return f"gpu:{gid}" if _resolve_paddle_use_gpu("auto") else "cpu"
+    return "cpu"
 
 
 def _build_paddle_model_dirs(model_root: str) -> Dict[str, str]:
@@ -487,27 +620,117 @@ def _build_paddle_model_dirs(model_root: str) -> Dict[str, str]:
     return dirs
 
 
-def _get_paddle_ocr_instance(use_gpu: bool, model_root: str) -> Optional[Any]:
-    key = (use_gpu, (model_root or "").strip())
-    if key in _PADDLE_OCR_CACHE:
-        return _PADDLE_OCR_CACHE[key]
+def _get_paddle_ocr_instance(
+    paddle_device: str,
+    paddle_gpu_id: int,
+    model_root: str,
+) -> Optional[Any]:
     try:
         from paddleocr import PaddleOCR
-    except ImportError:
+    except ImportError as e:
+        _log_import_once("paddleocr", e)
         return None
-    kwargs: Dict[str, Any] = {
-        "use_angle_cls": True,
-        "lang": "en",
-        "show_log": False,
-        "use_gpu": use_gpu,
-    }
-    kwargs.update(_build_paddle_model_dirs(model_root))
+
+    major = _paddleocr_major_version()
+    model_key = (model_root or "").strip()
+    if major is not None and major >= 3:
+        dev = _resolve_paddle_device_string(paddle_device, paddle_gpu_id)
+        key = ("v3", major, dev, model_key)
+    else:
+        use_gpu = _resolve_paddle_use_gpu(paddle_device)
+        key = ("v2", major or 0, use_gpu, model_key)
+    if key in _PADDLE_OCR_CACHE:
+        return _PADDLE_OCR_CACHE[key]
+
+    model_dirs = _build_paddle_model_dirs(model_root)
+    kwargs: Dict[str, Any] = {"use_angle_cls": True, "lang": "en"}
+    kwargs.update(model_dirs)
+
+    if major is not None and major >= 3:
+        kwargs["device"] = _resolve_paddle_device_string(paddle_device, paddle_gpu_id)
+    else:
+        kwargs["show_log"] = False
+        kwargs["use_gpu"] = _resolve_paddle_use_gpu(paddle_device)
+
     try:
         ocr = PaddleOCR(**kwargs)
-    except Exception:
+    except Exception as e:
+        _log_except("_get_paddle_ocr_instance.PaddleOCR", e)
         return None
     _PADDLE_OCR_CACHE[key] = ocr
     return ocr
+
+
+def _extract_paddleocr_text_lines(result: Any) -> List[str]:
+    """Normalize PaddleOCR 2.x list output and 3.x result objects to text lines."""
+    if result is None:
+        return []
+    lines: List[str] = []
+
+    if isinstance(result, list) and result and isinstance(result[0], dict):
+        d0 = result[0]
+        for k in ("rec_texts", "texts", "text"):
+            v = d0.get(k)
+            if isinstance(v, list) and v:
+                return [str(x) for x in v if x]
+
+    if isinstance(result, list) and result:
+        page0 = result[0]
+        if isinstance(page0, list) and page0:
+            first = page0[0]
+            if isinstance(first, (list, tuple)) and len(first) >= 2:
+                for line in page0:
+                    if not line or len(line) < 2:
+                        continue
+                    second = line[1]
+                    if isinstance(second, (list, tuple)) and second and second[0]:
+                        lines.append(str(second[0]))
+                    elif isinstance(second, str) and second:
+                        lines.append(second)
+                if lines:
+                    return [x for x in lines if str(x).strip()]
+
+    if hasattr(result, "json") and callable(getattr(result, "json")):
+        try:
+            j = result.json()
+            if isinstance(j, dict):
+                for k in ("rec_texts", "texts", "text"):
+                    v = j.get(k)
+                    if isinstance(v, list):
+                        return [str(x) for x in v if x]
+            if isinstance(j, list):
+                return _extract_paddleocr_text_lines(j)
+        except Exception as e:
+            _log_except("_extract_paddleocr_text_lines.json", e)
+
+    if isinstance(result, list):
+        for item in result:
+            if item is None:
+                continue
+            if isinstance(item, dict):
+                t = item.get("rec_text") or item.get("text")
+                if t:
+                    lines.append(str(t))
+            elif hasattr(item, "rec_text"):
+                rt = getattr(item, "rec_text", None)
+                if rt is not None:
+                    lines.append(str(rt))
+
+    return [x for x in lines if str(x).strip()]
+
+
+def _run_paddleocr_inference(ocr: Any, arr: Any) -> Any:
+    try:
+        return ocr.ocr(arr, cls=True)
+    except Exception as e:
+        _log_except("_run_paddleocr_inference.ocr", e)
+        predict = getattr(ocr, "predict", None)
+        if callable(predict):
+            try:
+                return predict(arr)
+            except Exception as e2:
+                _log_except("_run_paddleocr_inference.predict", e2)
+        return None
 
 
 def try_ocr_image_bbox(
@@ -517,6 +740,7 @@ def try_ocr_image_bbox(
     engine: str = "tesseract",
     dpi: int = 200,
     paddle_device: str = "auto",
+    paddle_gpu_id: int = 0,
     paddle_model_dir: str = "",
 ) -> Optional[str]:
     """
@@ -558,32 +782,28 @@ def try_ocr_image_bbox(
         if eng == "tesseract":
             try:
                 import pytesseract
-            except ImportError:
+            except ImportError as e:
+                _log_import_once("pytesseract", e)
                 return None
             return pytesseract.image_to_string(img)
 
         if eng == "paddleocr":
             try:
                 import numpy as np
-            except ImportError:
+            except ImportError as e:
+                _log_import_once("numpy", e)
                 return None
-            use_gpu = _resolve_paddle_use_gpu(paddle_device)
-            ocr = _get_paddle_ocr_instance(use_gpu, paddle_model_dir)
+            ocr = _get_paddle_ocr_instance(paddle_device, paddle_gpu_id, paddle_model_dir)
             if ocr is None:
                 return None
             arr = np.array(img)
-            result = ocr.ocr(arr, cls=True)
-            lines: List[str] = []
-            if result and result[0]:
-                for line in result[0]:
-                    if line and len(line) >= 2 and line[1] and line[1][0]:
-                        txt = line[1][0]
-                        if txt:
-                            lines.append(str(txt))
+            result = _run_paddleocr_inference(ocr, arr)
+            lines = _extract_paddleocr_text_lines(result)
             return "\n".join(lines) if lines else None
 
         return None
-    except Exception:
+    except Exception as e:
+        _log_except("try_ocr_image_bbox", e)
         return None
 
 
@@ -595,7 +815,8 @@ def try_extract_table_text_pdfplumber(
     """Extract table text from a bbox using pdfplumber (optional dependency)."""
     try:
         import pdfplumber
-    except ImportError:
+    except ImportError as e:
+        _log_import_once("pdfplumber", e)
         return None
     try:
         with pdfplumber.open(str(pdf_path)) as pdf:
@@ -611,7 +832,8 @@ def try_extract_table_text_pdfplumber(
             lines = ["\t".join((cell or "").strip() for cell in row) for row in table if row]
             txt = "\n".join(lines).strip()
             return txt or None
-    except Exception:
+    except Exception as e:
+        _log_except("try_extract_table_text_pdfplumber", e)
         return None
 
 
@@ -668,12 +890,22 @@ def extract_page_blocks(
     table_ocr_dpi: int = 200,
     table_ocr_min_chars: int = 8,
     paddle_device: str = "auto",
+    paddle_gpu_id: int = 0,
     paddle_model_dir: str = "",
     header_footer_mode: str = "none",
     header_top_ratio: float = 0.08,
     footer_bottom_ratio: float = 0.08,
     repeat_min_pages: int = 3,
     repeat_max_chars: int = 120,
+    table_merge_bypass: bool = False,
+    table_merge_gap: float = 5.0,
+    table_merge_horizontal: bool = False,
+    table_merge_vertical_overlap: float = 0.5,
+    table_merge_horizontal_overlap: float = 0.5,
+    table_expand_x: bool = False,
+    table_page_margin_left: float = 0.0,
+    table_page_margin_right: float = 0.0,
+    text_span_script_bypass: bool = False,
 ) -> Tuple[List[Dict[str, Any]], List[PageMetrics], Dict[str, Any]]:
     document_id = pdf_path.stem
     all_rows: List[Dict[str, Any]] = []
@@ -682,6 +914,8 @@ def extract_page_blocks(
     image_ocr_success_total = 0
     table_ocr_attempted_total = 0
     table_ocr_success_total = 0
+    table_detector_raw_total = 0
+    table_output_total = 0
 
     doc = fitz.open(pdf_path)
     try:
@@ -694,7 +928,7 @@ def extract_page_blocks(
             table_bboxes: List[Tuple[float, float, float, float]] = []
             page_char_count = [0]
 
-            table_rows, block_counter, table_ocr_attempted, table_ocr_success = _extract_tables(
+            table_rows, block_counter, table_ocr_attempted, table_ocr_success, table_raw_n = _extract_tables(
                 pdf_path,
                 page,
                 page_number,
@@ -707,12 +941,30 @@ def extract_page_blocks(
                 table_ocr_dpi=table_ocr_dpi,
                 table_ocr_min_chars=table_ocr_min_chars,
                 paddle_device=paddle_device,
+                paddle_gpu_id=paddle_gpu_id,
                 paddle_model_dir=paddle_model_dir,
+                table_merge_bypass=table_merge_bypass,
+                table_merge_gap=table_merge_gap,
+                table_merge_horizontal=table_merge_horizontal,
+                table_merge_vertical_overlap=table_merge_vertical_overlap,
+                table_merge_horizontal_overlap=table_merge_horizontal_overlap,
+                table_expand_x=table_expand_x,
+                table_page_margin_left=table_page_margin_left,
+                table_page_margin_right=table_page_margin_right,
             )
+            table_detector_raw_total += table_raw_n
+            table_output_total += len(table_rows)
             table_ocr_attempted_total += table_ocr_attempted
             table_ocr_success_total += table_ocr_success
             text_img_rows, block_counter = _text_blocks_from_dict(
-                page, page_number, run, document_id, block_counter, table_bboxes, page_char_count
+                page,
+                page_number,
+                run,
+                document_id,
+                block_counter,
+                table_bboxes,
+                page_char_count,
+                text_span_script_bypass=text_span_script_bypass,
             )
             page_rows = table_rows + text_img_rows
             _split_equation_tags(page_rows)
@@ -752,6 +1004,7 @@ def extract_page_blocks(
                         engine=image_ocr_engine,
                         dpi=image_ocr_dpi,
                         paddle_device=paddle_device,
+                        paddle_gpu_id=paddle_gpu_id,
                         paddle_model_dir=paddle_model_dir,
                     )
                     if ocr_text and ocr_text.strip() and len(ocr_text.strip()) >= image_ocr_min_chars:
@@ -848,13 +1101,33 @@ def extract_page_blocks(
             "table_ocr_route": table_ocr_route,
             "table_ocr_attempted": table_ocr_attempted_total,
             "table_ocr_success": table_ocr_success_total,
+            "table_merge_enabled": not table_merge_bypass,
+            "table_expand_x_enabled": table_expand_x,
+            "table_detector_raw_count": table_detector_raw_total,
+            "table_output_count": table_output_total,
+            "table_merge_gap": table_merge_gap,
+            "table_merge_horizontal": table_merge_horizontal,
+            "text_span_script_enabled": not text_span_script_bypass,
             "paddle_device": paddle_device,
-            "paddle_use_gpu": _resolve_paddle_use_gpu(paddle_device)
-            if (image_ocr_engine == "paddleocr" or table_text_engine == "paddleocr")
-            else None,
+            "paddle_gpu_id": int(paddle_gpu_id),
             "paddle_model_dir": (paddle_model_dir or "").strip() or None,
         }
     finally:
         doc.close()
+
+    paddle_used = image_ocr_engine == "paddleocr" or table_text_engine == "paddleocr"
+    maj = _paddleocr_major_version() if paddle_used else None
+    summary["paddleocr_major_version"] = maj
+    if paddle_used:
+        if maj is not None and maj >= 3:
+            dev_res = _resolve_paddle_device_string(paddle_device, paddle_gpu_id)
+            summary["paddle_device_resolved"] = dev_res
+            summary["paddle_use_gpu"] = dev_res.startswith("gpu")
+        else:
+            summary["paddle_device_resolved"] = None
+            summary["paddle_use_gpu"] = _resolve_paddle_use_gpu(paddle_device)
+    else:
+        summary["paddle_device_resolved"] = None
+        summary["paddle_use_gpu"] = None
 
     return all_rows, metrics_list, summary

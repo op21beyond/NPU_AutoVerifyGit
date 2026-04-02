@@ -113,6 +113,12 @@ def main() -> None:
         help="Optional PaddleOCR model root directory (expects det/rec/cls subdirs).",
     )
     parser.add_argument(
+        "--paddle-gpu-id",
+        type=int,
+        default=0,
+        help="GPU index for PaddleOCR 3.x device string (gpu:N). Ignored for 2.x use_gpu flag.",
+    )
+    parser.add_argument(
         "--header-footer-mode",
         choices=("none", "position", "repeat"),
         default="none",
@@ -148,6 +154,44 @@ def main() -> None:
         default="pymupdf",
         help="Text extraction backend policy: pymupdf only, pymupdf4llm supplemental, or hybrid",
     )
+    parser.add_argument(
+        "--table-merge-bypass",
+        action="store_true",
+        help="Skip PyMuPDF table bbox merge (use raw find_tables() rows; for before/after comparison).",
+    )
+    parser.add_argument(
+        "--table-merge-gap",
+        type=float,
+        default=5.0,
+        help="Max vertical/horizontal gap (pt) for adjacent table bbox merge when merge is enabled (default: 5).",
+    )
+    parser.add_argument(
+        "--table-merge-horizontal",
+        action="store_true",
+        help="Also merge horizontally adjacent table bboxes (default: off; overlap/vertical merge always on when merge enabled).",
+    )
+    parser.add_argument(
+        "--table-expand-x-to-page",
+        action="store_true",
+        help="After merge, expand each table bbox x-range to page width minus margins (y unchanged).",
+    )
+    parser.add_argument(
+        "--table-page-margin-left",
+        type=float,
+        default=0.0,
+        help="Left margin (pt) reserved when using --table-expand-x-to-page (default: 0).",
+    )
+    parser.add_argument(
+        "--table-page-margin-right",
+        type=float,
+        default=0.0,
+        help="Right margin (pt) reserved when using --table-expand-x-to-page (default: 0).",
+    )
+    parser.add_argument(
+        "--text-span-script-bypass",
+        action="store_true",
+        help="Skip <sup>/<sub> tagging on text blocks (plain PyMuPDF span merge; for before/after comparison).",
+    )
     args = parser.parse_args()
 
     pdf_path = Path(args.input_pdf)
@@ -169,12 +213,20 @@ def main() -> None:
         table_ocr_dpi=args.table_ocr_dpi,
         table_ocr_min_chars=args.table_ocr_min_chars,
         paddle_device=args.paddle_device,
+        paddle_gpu_id=args.paddle_gpu_id,
         paddle_model_dir=args.paddle_model_dir,
         header_footer_mode=args.header_footer_mode,
         header_top_ratio=args.header_top_ratio,
         footer_bottom_ratio=args.footer_bottom_ratio,
         repeat_min_pages=args.repeat_min_pages,
         repeat_max_chars=args.repeat_max_chars,
+        table_merge_bypass=args.table_merge_bypass,
+        table_merge_gap=args.table_merge_gap,
+        table_merge_horizontal=args.table_merge_horizontal,
+        table_expand_x=args.table_expand_x_to_page,
+        table_page_margin_left=args.table_page_margin_left,
+        table_page_margin_right=args.table_page_margin_right,
+        text_span_script_bypass=args.text_span_script_bypass,
     )
 
     out = artifact_path("stage1_ingestion", "page_blocks.jsonl")

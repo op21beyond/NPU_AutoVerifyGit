@@ -7,10 +7,10 @@ pytesseract>=0.3.10
 # Optional: table extraction backend for --table-text-engine pdflumber
 pdfplumber>=0.11.0
 
-# Optional: PaddleOCR image/table OCR backend
+# Optional: PaddleOCR image/table OCR backend (2.x and 3.x supported; Stage1 picks init args at runtime)
 # Install one Paddle runtime matching your environment:
 # - CPU: pip install paddlepaddle
-# - GPU: pip install paddlepaddle-gpu
+# - GPU: pip install paddlepaddle-gpu  (match CUDA version per Paddle install docs)
 paddleocr>=2.7.0
 
 # Stage 2 optional: --extractor openai (set OPENAI_API_KEY)

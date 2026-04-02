@@ -22,3 +22,4 @@
 - 통합 계층은 orchestration, state tracking, retry, lineage 기록을 담당
 - 단계별 실험 결과를 비교해 승자 전략을 통합 계층으로 승격
 - 실행 순서: `stage1` → `stage2` → `stage3` → **`stage3b`(전역 필드·별칭)** → `stage4` → `stage5` → `stage6`(조합만) → `stage7`
+- Stage 1 인제스트 옵션(표 bbox 병합, 첨자 태깅, `parsing_report` 필드)은 [`doc/stage1_ingestion.md`](stage1_ingestion.md)를 기준으로 한다.
