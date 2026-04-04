@@ -11,7 +11,13 @@ import fitz
 _TEXT_FONT_SUPERSCRIPT = int(getattr(fitz, "TEXT_FONT_SUPERSCRIPT", 1))
 
 
-def merge_lines_with_span_scripts(lines: List[Dict[str, Any]]) -> str:
+def _script_body_length(s: str) -> int:
+    """Length for cap: newlines excluded; tab counts as 4."""
+    t = s.replace("\n", "")
+    return sum(4 if c == "\t" else 1 for c in t)
+
+
+def merge_lines_with_span_scripts(lines: List[Dict[str, Any]], *, max_subsup_length: int = 50) -> str:
     """
     Build block text from dict lines, wrapping <sup>/<sub> around detected script spans.
     Lines are joined with newlines.
@@ -20,11 +26,11 @@ def merge_lines_with_span_scripts(lines: List[Dict[str, Any]]) -> str:
         return ""
     out: List[str] = []
     for line in lines:
-        out.append(_line_to_tagged_text(line))
+        out.append(_line_to_tagged_text(line, max_subsup_length=max_subsup_length))
     return "\n".join(out)
 
 
-def _line_to_tagged_text(line: Dict[str, Any]) -> str:
+def _line_to_tagged_text(line: Dict[str, Any], *, max_subsup_length: int) -> str:
     spans_in = line.get("spans") or []
     spans: List[Dict[str, Any]] = [s for s in spans_in if s.get("text") is not None and str(s.get("text", "")) != ""]
     if not spans:
@@ -68,8 +74,12 @@ def _line_to_tagged_text(line: Dict[str, Any]) -> str:
         raw_t = str(s.get("text", ""))
         if not raw_t:
             continue
-        safe = html.escape(raw_t, quote=False)
         role = _classify_span(s, ref_size, body_cy)
+        if role in ("sup", "sub") and _script_body_length(raw_t) > max_subsup_length:
+            safe = html.escape(raw_t, quote=False)
+            parts.append(safe)
+            continue
+        safe = html.escape(raw_t, quote=False)
         if role == "sup":
             parts.append(f"<sup>{safe}</sup>")
         elif role == "sub":

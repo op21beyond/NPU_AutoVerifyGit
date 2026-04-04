@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.metadata
 import re
 import sys
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
@@ -11,6 +12,12 @@ import fitz
 
 from src.common.runtime import StageRun
 from src.stage1_ingestion.table_merge import expand_bbox_to_page_width, merge_table_bboxes
+from src.stage1_ingestion.heading_preservation import (
+    apply_heading_tags_to_rows,
+    build_size_to_role,
+    collect_font_sizes_from_document,
+)
+from src.stage1_ingestion.page_cross_table_merge import apply_cross_page_table_merge
 from src.stage1_ingestion.text_span_scripts import merge_lines_with_span_scripts
 
 _LOGGED_IMPORT_MODULES: Set[str] = set()
@@ -277,6 +284,7 @@ def _extract_tables(
         vertical_min_width_overlap=table_merge_vertical_overlap,
         horizontal_min_height_overlap=table_merge_horizontal_overlap,
         horizontal_merge=table_merge_horizontal,
+        page_width=page_width,
     )
     for mb, gidx in zip(merged_bboxes, groups):
         group_tabs = _sort_tabs_reading_order([tables[i] for i in gidx])
@@ -302,6 +310,7 @@ def _text_blocks_from_dict(
     page_char_count: List[int],
     *,
     text_span_script_bypass: bool = False,
+    text_span_max_subsup_length: int = 50,
 ) -> Tuple[List[Dict[str, Any]], int]:
     rows: List[Dict[str, Any]] = []
     td = page.get_text("dict")
@@ -324,7 +333,7 @@ def _text_blocks_from_dict(
                 raw = _merge_span_text(lines)
                 tex_method = "text_layer"
             else:
-                raw = merge_lines_with_span_scripts(lines)
+                raw = merge_lines_with_span_scripts(lines, max_subsup_length=text_span_max_subsup_length)
                 tex_method = "text_layer+span_scripts"
             char_count = len(raw)
             if table_bboxes and any(_center_inside(bbox, tb) and _rect_overlap(bbox, tb) > 0.35 for tb in table_bboxes):
@@ -807,6 +816,12 @@ def try_ocr_image_bbox(
         return None
 
 
+# Hard toggles for pdfplumber debugging / table-settings experiments (edit in source).
+_PDFPLUMBER_DEBUG_DRAW_RECTS = False
+_PDFPLUMBER_DEBUG_DRAW_WORDS = False
+_PDFPLUMBER_USE_CUSTOM_TABLE_SETTINGS = False
+
+
 def try_extract_table_text_pdfplumber(
     pdf_path: Path,
     page_number: int,
@@ -825,7 +840,38 @@ def try_extract_table_text_pdfplumber(
             p = pdf.pages[page_number - 1]
             x0, y0, x1, y1 = [float(v) for v in bbox]
             crop = p.crop((x0, y0, x1, y1))
-            tables = crop.extract_tables()
+
+            if _PDFPLUMBER_DEBUG_DRAW_RECTS or _PDFPLUMBER_DEBUG_DRAW_WORDS:
+                try:
+                    img = crop.to_image(resolution=150)
+                    if _PDFPLUMBER_DEBUG_DRAW_RECTS:
+                        rects = getattr(crop, "rects", None)
+                        if rects:
+                            img.draw_rects(rects)
+                    if _PDFPLUMBER_DEBUG_DRAW_WORDS:
+                        words = crop.extract_words()
+                        if words:
+                            img.draw_words(words)
+                    dbg = Path(tempfile.gettempdir()) / "pdfplumber_table_debug.png"
+                    img.save(str(dbg))
+                except Exception as e:
+                    _log_except("try_extract_table_text_pdfplumber.debug_image", e)
+
+            if _PDFPLUMBER_USE_CUSTOM_TABLE_SETTINGS:
+                tables = crop.extract_tables(
+                    table_settings={
+                        "vertical_strategy": "lines",
+                        "horizontal_strategy": "lines",
+                        "snap_tolerance": 3,
+                        "join_tolerance": 3,
+                        "edge_min_length": 3,
+                        "min_words_vertical": 1,
+                        "min_words_horizontal": 1,
+                        "intersection_tolerance": 3,
+                    }
+                )
+            else:
+                tables = crop.extract_tables()
             if not tables:
                 return None
             table = tables[0] or []
@@ -906,6 +952,12 @@ def extract_page_blocks(
     table_page_margin_left: float = 0.0,
     table_page_margin_right: float = 0.0,
     text_span_script_bypass: bool = False,
+    text_span_max_subsup_length: int = 50,
+    cross_page_table_merge: bool = True,
+    cross_page_bottom_ratio: float = 0.08,
+    cross_page_top_ratio: float = 0.08,
+    cross_page_min_width_overlap: float = 0.5,
+    preserve_heading: bool = False,
 ) -> Tuple[List[Dict[str, Any]], List[PageMetrics], Dict[str, Any]]:
     document_id = pdf_path.stem
     all_rows: List[Dict[str, Any]] = []
@@ -919,6 +971,11 @@ def extract_page_blocks(
 
     doc = fitz.open(pdf_path)
     try:
+        size_to_role_fn = None
+        if preserve_heading:
+            _sizes = collect_font_sizes_from_document(doc)
+            size_to_role_fn = build_size_to_role(_sizes)
+
         total_pages = doc.page_count
         pages_ok = 0
         for page_index in range(total_pages):
@@ -964,7 +1021,8 @@ def extract_page_blocks(
                 block_counter,
                 table_bboxes,
                 page_char_count,
-                text_span_script_bypass=text_span_script_bypass,
+                text_span_script_bypass=text_span_script_bypass or preserve_heading,
+                text_span_max_subsup_length=text_span_max_subsup_length,
             )
             page_rows = table_rows + text_img_rows
             _split_equation_tags(page_rows)
@@ -1071,6 +1129,18 @@ def extract_page_blocks(
                 pages_ok += 1
             all_rows.extend(page_rows)
 
+        if preserve_heading and size_to_role_fn is not None:
+            apply_heading_tags_to_rows(all_rows, doc, size_to_role_fn)
+
+        all_rows, cross_page_table_rows_removed = apply_cross_page_table_merge(
+            all_rows,
+            doc,
+            enabled=cross_page_table_merge,
+            bottom_margin_ratio=cross_page_bottom_ratio,
+            top_margin_ratio=cross_page_top_ratio,
+            min_width_overlap=cross_page_min_width_overlap,
+        )
+
         filter_stats = HeaderFooterFilterStats(mode=header_footer_mode)
         if header_footer_mode == "position":
             all_rows, filter_stats = _drop_header_footer_by_position(
@@ -1107,7 +1177,11 @@ def extract_page_blocks(
             "table_output_count": table_output_total,
             "table_merge_gap": table_merge_gap,
             "table_merge_horizontal": table_merge_horizontal,
-            "text_span_script_enabled": not text_span_script_bypass,
+            "text_span_script_enabled": not (text_span_script_bypass or preserve_heading),
+            "text_span_max_subsup_length": text_span_max_subsup_length,
+            "cross_page_table_merge": cross_page_table_merge,
+            "cross_page_table_rows_removed": cross_page_table_rows_removed,
+            "preserve_heading": preserve_heading,
             "paddle_device": paddle_device,
             "paddle_gpu_id": int(paddle_gpu_id),
             "paddle_model_dir": (paddle_model_dir or "").strip() or None,

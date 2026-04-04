@@ -39,7 +39,7 @@ python src/stage1_ingestion/main.py --input-pdf "path/to/architecture.pdf"
 
 Stage 1 (optional hybrid text backend): `python src/stage1_ingestion/main.py --input-pdf "...pdf" --text-backend hybrid` writes supplemental `artifacts/stage1_ingestion/pymupdf4llm_corpus.json`.
 
-Stage 1 also supports **table bbox merge** (default on), optional **full-width x expansion** for table bboxes, and **`<sup>`/`<sub>` tagging** on text blocks from span metadata (default on). Use `--table-merge-bypass` / `--text-span-script-bypass` for before/after comparisons. See [`doc/stage1_ingestion.md`](doc/stage1_ingestion.md) for flags and `parsing_report.json` fields.
+Stage 1 also supports **table bbox merge** (default on), optional **full-width x expansion**, **cross-page table merge** (edge-aligned bottom/top blocks), **`<sup>`/`<sub>` tagging** with `--max-subsup-length`, optional **`--preserve-heading`** (font-size role tags in `raw_text`), and **`--export-reading-order pdf|docx|md`**. Use `--table-merge-bypass`, `--text-span-script-bypass`, or `--no-cross-page-table-merge` for comparisons. See [`doc/stage1_ingestion.md`](doc/stage1_ingestion.md).
 
 Stage 2 (optional LLM): set `OPENAI_API_KEY`, then e.g. `python src/stage2_instruction_extraction/main.py --extractor openai --openai-model gpt-4o-mini`. Default is rule-based `--extractor regex`.
 

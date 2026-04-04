@@ -192,6 +192,51 @@ def main() -> None:
         action="store_true",
         help="Skip <sup>/<sub> tagging on text blocks (plain PyMuPDF span merge; for before/after comparison).",
     )
+    parser.add_argument(
+        "--max-subsup-length",
+        type=int,
+        default=50,
+        help="Max length (tabs count as 4; newlines excluded) for <sup>/<sub> wrapping (default: 50).",
+    )
+    parser.add_argument(
+        "--no-cross-page-table-merge",
+        action="store_true",
+        help="Disable merging tables that continue across consecutive page boundaries (default: merge enabled).",
+    )
+    parser.add_argument(
+        "--cross-page-bottom-ratio",
+        type=float,
+        default=0.08,
+        help="Bottom-of-page table must extend into this fraction from page bottom (default: 0.08).",
+    )
+    parser.add_argument(
+        "--cross-page-top-ratio",
+        type=float,
+        default=0.08,
+        help="Top-of-next-page table must start within this fraction from page top (default: 0.08).",
+    )
+    parser.add_argument(
+        "--cross-page-min-width-overlap",
+        type=float,
+        default=0.5,
+        help="Min horizontal projection overlap ratio for cross-page table merge (default: 0.5).",
+    )
+    parser.add_argument(
+        "--preserve-heading",
+        action="store_true",
+        help="Two-pass font-size roles: tag text/equation raw_text with <heading1>..</heading1> etc. (disables sup/sub merge for those blocks).",
+    )
+    parser.add_argument(
+        "--export-reading-order",
+        choices=("none", "pdf", "docx", "md"),
+        default="none",
+        help="After extraction, export page_blocks in reading order: pdf/docx (reportlab/python-docx) or md (stdlib only).",
+    )
+    parser.add_argument(
+        "--export-reading-order-path",
+        default="",
+        help="Output path for --export-reading-order (default: artifact under stage1_ingestion/).",
+    )
     args = parser.parse_args()
 
     pdf_path = Path(args.input_pdf)
@@ -227,10 +272,44 @@ def main() -> None:
         table_page_margin_left=args.table_page_margin_left,
         table_page_margin_right=args.table_page_margin_right,
         text_span_script_bypass=args.text_span_script_bypass,
+        text_span_max_subsup_length=args.max_subsup_length,
+        cross_page_table_merge=not args.no_cross_page_table_merge,
+        cross_page_bottom_ratio=args.cross_page_bottom_ratio,
+        cross_page_top_ratio=args.cross_page_top_ratio,
+        cross_page_min_width_overlap=args.cross_page_min_width_overlap,
+        preserve_heading=args.preserve_heading,
     )
 
     out = artifact_path("stage1_ingestion", "page_blocks.jsonl")
     write_jsonl(out, rows)
+
+    if args.export_reading_order != "none":
+        from src.stage1_ingestion.reading_order_export import (
+            export_page_blocks_to_docx,
+            export_page_blocks_to_markdown,
+            export_page_blocks_to_pdf,
+        )
+
+        if args.export_reading_order_path:
+            export_path = Path(args.export_reading_order_path)
+        else:
+            if args.export_reading_order == "pdf":
+                ext = ".pdf"
+            elif args.export_reading_order == "docx":
+                ext = ".docx"
+            else:
+                ext = ".md"
+            export_path = artifact_path("stage1_ingestion", f"reading_order_export{ext}")
+        try:
+            if args.export_reading_order == "pdf":
+                export_page_blocks_to_pdf(rows, pdf_path, export_path)
+            elif args.export_reading_order == "docx":
+                export_page_blocks_to_docx(rows, pdf_path, export_path)
+            else:
+                export_page_blocks_to_markdown(rows, pdf_path, export_path)
+            print(f"reading-order export -> {export_path}")
+        except RuntimeError as e:
+            raise SystemExit(str(e)) from e
 
     parsing_report = {
         **summary,

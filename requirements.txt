@@ -18,3 +18,7 @@ openai>=1.40.0
 
 # Stage 1 optional: supplemental markdown corpus for Stage 2 recall boost
 pymupdf4llm>=0.0.17
+
+# Stage 1 optional: --export-reading-order pdf|docx (md needs no extra deps)
+reportlab>=4.0.0
+python-docx>=1.1.0

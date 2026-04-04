@@ -44,6 +44,10 @@
 - 텍스트 본문 상·아래첨자(기본 ON): `get_text("dict")` 스팬의 `flags`(예: `TEXT_FONT_SUPERSCRIPT`)와 크기·세로 위치 휴리스틱으로 `<sup>`, `<sub>` 태그를 붙인 뒤 `raw_text`에 반영한다. NPU 명령명 등과의 `_` 혼동을 줄이려면 태그로 구분하는 편이 유리하다.
   - `--text-span-script-bypass`: 태그 후처리를 끄고 기존처럼 스팬을 평탄하게 이어붙인 텍스트만 사용(전후 비교용).
   - `parsing_report.json`에 `text_span_script_enabled` 기록.
+  - `--max-subsup-length`(기본 50): `<sup>`/`<sub>`로 감쌀 스팬 본문의 최대 길이(개행 제외, 탭=4). 초과 시 태그 없이 평문 유지.
+  - **페이지 경계 표 병합**(기본 ON): 이전 페이지 하단에 붙은 표와 다음 페이지 상단 표가 레이아웃(가로 겹침)으로 이어지면 한 블록으로 합침(`multi_page_bboxes`). 후보는 각각 **해당 페이지에서 표가 페이지 가장자리에 붙어 있어야** 함(하단 표는 페이지 p의 블록 중 **가장 아래**, 상단 표는 p+1의 **가장 위**, 허용 오차 약 2pt). 끄기: `--no-cross-page-table-merge`. 선택: `--cross-page-bottom-ratio`, `--cross-page-top-ratio`, `--cross-page-min-width-overlap`.
+  - **제목·본문 역할 보존**(선택): `--preserve-heading` — 문서 전체에서 스팬 **글자 크기**를 모은 뒤(1패스), 크기→역할(`heading1`–`heading3`, `body`, `caption`, `comment`) 매핑으로 텍스트·수식 블록의 `raw_text`를 `<heading1>…</heading1>` 형태로 재작성(2패스). 켜면 해당 블록에서 `<sup>`/`<sub>` 병합은 끄고 평탄 스팬을 쓴다(`--text-span-script-bypass`와 동일 효과).
+  - **읽는 순서 내보내기**: `--export-reading-order pdf|docx|md` + 선택 `--export-reading-order-path`(기본 `reading_order_export.pdf|.docx|.md`). 블록 유형별로 텍스트/표/이미지/수식을 구분하고, 태그가 있으면 PDF(글꼴 크기)·Word(Heading 스타일)·Markdown(`#`/`##` 등)에 반영. `md`는 추가 패키지 없음; `pdf`/`docx`는 `reportlab`/`python-docx` 필요.
 - 오픈 이슈:
   - 이미지 표 구조 복원(`img2table`)은 미연동 (현재 table OCR은 텍스트 라인 추출 중심)
   - 표·본문 중복 억제는 bbox 휴리스틱 수준

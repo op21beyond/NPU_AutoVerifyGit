@@ -1,6 +1,6 @@
 {
   "stage_name": "stage1_ingestion",
-  "stage_run_id": "stage1_ingestion-bffdcf26b51d",
+  "stage_run_id": "stage1_ingestion-04d06c5f815b",
   "ocr_candidate_pages": [
     1
   ],
@@ -47,7 +47,10 @@
     "table_output_count": 0,
     "table_merge_gap": 5.0,
     "table_merge_horizontal": false,
-    "text_span_script_enabled": false,
+    "text_span_script_enabled": true,
+    "text_span_max_subsup_length": 50,
+    "cross_page_table_merge": true,
+    "cross_page_table_rows_removed": 0,
     "paddle_device": "auto",
     "paddle_gpu_id": 0,
     "paddle_model_dir": null,

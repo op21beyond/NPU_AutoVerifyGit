@@ -3,9 +3,14 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 BBox = Tuple[float, float, float, float]
+
+# Hard switch: True = use _should_merge_pair_v2 (full-width expand then vertical overlap); False = v1 heuristics.
+MERGE_PAIR_USE_V2 = True
+# v2 horizontal margins as fraction of page width (0.1 + 0.1 = 0.2 total inset from full width).
+_MERGE_V2_MARGIN_FRAC = 0.1
 
 
 class _UnionFind:
@@ -102,7 +107,7 @@ def _merge_horizontal_adjacent(a: BBox, b: BBox, gap_px: float, min_h_ratio: flo
     return False
 
 
-def _should_merge_pair(
+def _should_merge_pair_v1(
     a: BBox,
     b: BBox,
     *,
@@ -120,6 +125,58 @@ def _should_merge_pair(
     return False
 
 
+def _vertical_intervals_overlap_closed(a: BBox, b: BBox) -> bool:
+    """True if [a.y0,a.y1] and [b.y0,b.y1] intersect with positive length or touching edges."""
+    y0a, y1a = a[1], a[3]
+    y0b, y1b = b[1], b[3]
+    return max(y0a, y0b) <= min(y1a, y1b)
+
+
+def _should_merge_pair_v2(a: BBox, b: BBox, page_width: float) -> bool:
+    """
+    Expand both bboxes to page width minus 0.1*W left and right (same as expand_bbox_to_page_width),
+    then merge if vertical spans overlap (symmetric in a,b; equivalent to testing upper/lower orderings).
+    """
+    if page_width <= 0:
+        return False
+    ml = _MERGE_V2_MARGIN_FRAC * float(page_width)
+    mr = _MERGE_V2_MARGIN_FRAC * float(page_width)
+    ae = expand_bbox_to_page_width(a, page_width, ml, mr)
+    be = expand_bbox_to_page_width(b, page_width, ml, mr)
+    return _vertical_intervals_overlap_closed(ae, be)
+
+
+def _should_merge_pair(
+    a: BBox,
+    b: BBox,
+    *,
+    gap_px: float,
+    vertical_min_width_overlap: float,
+    horizontal_min_height_overlap: float,
+    horizontal_merge: bool,
+    page_width: Optional[float] = None,
+) -> bool:
+    if MERGE_PAIR_USE_V2:
+        if page_width is not None and page_width > 0:
+            return _should_merge_pair_v2(a, b, page_width)
+        return _should_merge_pair_v1(
+            a,
+            b,
+            gap_px=gap_px,
+            vertical_min_width_overlap=vertical_min_width_overlap,
+            horizontal_min_height_overlap=horizontal_min_height_overlap,
+            horizontal_merge=horizontal_merge,
+        )
+    return _should_merge_pair_v1(
+        a,
+        b,
+        gap_px=gap_px,
+        vertical_min_width_overlap=vertical_min_width_overlap,
+        horizontal_min_height_overlap=horizontal_min_height_overlap,
+        horizontal_merge=horizontal_merge,
+    )
+
+
 def merge_table_bboxes(
     bboxes: List[BBox],
     *,
@@ -127,6 +184,7 @@ def merge_table_bboxes(
     vertical_min_width_overlap: float = 0.5,
     horizontal_min_height_overlap: float = 0.5,
     horizontal_merge: bool = False,
+    page_width: Optional[float] = None,
 ) -> Tuple[List[BBox], List[List[int]]]:
     """
     Cluster table bboxes by overlap (required), vertical adjacency, and optional horizontal adjacency.
@@ -148,6 +206,7 @@ def merge_table_bboxes(
                 vertical_min_width_overlap=vertical_min_width_overlap,
                 horizontal_min_height_overlap=horizontal_min_height_overlap,
                 horizontal_merge=horizontal_merge,
+                page_width=page_width,
             ):
                 uf.union(i, j)
 
