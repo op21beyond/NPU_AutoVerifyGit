@@ -85,6 +85,14 @@ python src/integration_pipeline/main.py --input-pdf "path/to/architecture.pdf"
 
 Artifacts are written to `artifacts/`.
 
+## Tools
+
+The [`tools/`](tools/) folder holds **optional utilities** that are not part of the main stage pipeline—small apps and scripts for development, manual testing, and ad-hoc LLM experiments.
+
+- **`streamlit_llm_chat`**: Streamlit UI that connects to up to five company remote LLMs (OpenAI-compatible Chat Completions, configured via `COMPANY_LLM_1` … `COMPANY_LLM_5` env vars), loads Stage1 **`page_blocks.jsonl`**, builds a **`selected_page_blocks`** map from a one-line page/block selector, and sends System/User prompts (single- or multi-turn). Install extras with `pip install -r tools/requirements-tools.txt`, then run `streamlit run tools/streamlit_llm_chat/app.py` from the repo root.
+
+Full details, selector syntax, and environment variables: **[`tools/README.md`](tools/README.md)**.
+
 ## Structure
 
 - `src/stage*_*/main.py`: stage entry points (`stage3b_global_field_schema` = 전역 필드 집합·별칭)
@@ -92,3 +100,4 @@ Artifacts are written to `artifacts/`.
 - `src/common`: shared helpers
 - `data_contracts`: JSON schemas for stage IO
 - `doc`: mission/plan/stage docs
+- `tools/`: optional dev utilities (see [`tools/README.md`](tools/README.md))
