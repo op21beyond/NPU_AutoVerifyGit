@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "instruction_field_map",
+  "type": "object",
+  "required": ["trace_id", "instruction_name", "field_name", "bit_range", "source_refs"],
+  "properties": {
+    "trace_id": { "type": "string" },
+    "instruction_name": { "type": "string" },
+    "variation": {
+      "type": ["string", "null"],
+      "description": "Stage2 instruction_catalog.variation 과 동일; 단일 레이아웃이면 null."
+    },
+    "field_name": { "type": "string" },
+    "bit_range": { "type": "string" },
+    "word_index": { "type": "integer" },
+    "confidence_score": { "type": "number" },
+    "source_refs": { "type": "array", "items": { "type": "object" } },
+    "uncertain": { "type": "boolean" }
+  },
+  "additionalProperties": true
+}

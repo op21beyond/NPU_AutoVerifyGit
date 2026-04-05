@@ -3,19 +3,21 @@ from __future__ import annotations
 import json
 import os
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from src.common.opcode import parse_opcode_token
 from src.common.runtime import StageRun
+from src.common.instruction_key import catalog_row_key, normalize_variation
 
 _SYSTEM_PROMPT = """You extract NPU/ISA instruction entries from architecture document excerpts.
 Return ONLY valid JSON (no markdown fences). The JSON must match this shape:
 {
   "instructions": [
     {
-      "instruction_name": "<uppercase mnemonic or name as in doc>",
+      "instruction_name": "<logical family name, uppercase, e.g. RESCALE>",
+      "variation": "<short label or null>",
       "opcode_raw": "<verbatim opcode string from doc, e.g. 0x2A or 42>",
-      "aliases": ["<optional alternate names>"],
+      "aliases": ["<optional: family aliases + variation-specific mnemonics, e.g. RESCALE_CW>"],
       "execution_unit": "<hardware block name if stated, else UNKNOWN_UNIT>",
       "instruction_kind": "macro" | "micro" | "unknown",
       "instruction_kind_confidence": <number 0..1>,
@@ -25,10 +27,12 @@ Return ONLY valid JSON (no markdown fences). The JSON must match this shape:
   ]
 }
 Rules:
+- instruction_name is the shared logical instruction (one family). If the document uses distinct mnemonics for the same opcode with different field layouts (e.g. RESCALE_CW vs RESCALE_GW for channelwise vs groupwise), use the SAME instruction_name (e.g. RESCALE), set variation to a short discriminator (e.g. CW, GW), and list document mnemonics in aliases.
+- If there is only one form, set variation to null and still list surface names in aliases when helpful.
 - Include only real instruction-like entities (opcodes / instruction mnemonics), not generic English words.
 - If opcode is unclear, set opcode_raw to "UNKNOWN" and keep confidence_score low.
 - source_page must match one of the page numbers shown in the excerpt headers.
-- Prefer fewer, higher-quality rows over noisy duplicates.
+- Prefer fewer, higher-quality rows over noisy duplicates. Emit separate rows for different (instruction_name, variation) pairs.
 """
 
 
@@ -78,13 +82,14 @@ def _normalize_rows_from_llm(
     if not isinstance(items, list):
         return []
 
-    merged: Dict[str, Dict[str, Any]] = {}
+    merged: Dict[Tuple[str, str], Dict[str, Any]] = {}
     for raw in items:
         if not isinstance(raw, dict):
             continue
         name = str(raw.get("instruction_name", "")).strip().upper()
         if not name or len(name) > 64:
             continue
+        var = normalize_variation(raw.get("variation"))
         opc_raw = str(raw.get("opcode_raw", "UNKNOWN")).strip() or "UNKNOWN"
         page = raw.get("source_page")
         try:
@@ -94,6 +99,7 @@ def _normalize_rows_from_llm(
 
         row = {
             "instruction_name": name,
+            "variation": var,
             "opcode_raw": opc_raw,
             "aliases": [str(a).strip() for a in (raw.get("aliases") or []) if str(a).strip()],
             "execution_unit": str(raw.get("execution_unit", "UNKNOWN_UNIT")).strip() or "UNKNOWN_UNIT",
@@ -101,9 +107,8 @@ def _normalize_rows_from_llm(
             "instruction_kind_confidence": _clamp01(raw.get("instruction_kind_confidence"), 0.35),
             "confidence_score": _clamp01(raw.get("confidence_score"), 0.6),
             "source_refs": [{"page": page_i}],
-            "_merge_key": name,
         }
-        key = name
+        key = catalog_row_key(name, var)
         if key not in merged:
             merged[key] = row
             continue
@@ -112,7 +117,12 @@ def _normalize_rows_from_llm(
             merged[key] = row
 
     out: List[Dict[str, Any]] = []
-    for idx, row in enumerate(sorted(merged.values(), key=lambda r: r["instruction_name"])):
+    for idx, row in enumerate(
+        sorted(
+            merged.values(),
+            key=lambda r: (r["instruction_name"], r.get("variation") or ""),
+        )
+    ):
         opc_val, opc_radix = parse_opcode_token(row["opcode_raw"])
         out.append(
             {
@@ -120,6 +130,7 @@ def _normalize_rows_from_llm(
                 "stage_name": run.stage_name,
                 "stage_run_id": run.stage_run_id,
                 "instruction_name": row["instruction_name"],
+                "variation": row.get("variation"),
                 "aliases": row["aliases"],
                 "opcode_raw": row["opcode_raw"],
                 "opcode_radix": opc_radix,
@@ -157,7 +168,7 @@ def build_instruction_catalog_openai(
         from openai import OpenAI
     except ImportError as e:
         raise RuntimeError(
-            "The 'openai' package is required for --extractor openai. Install: pip install openai"
+            "The 'openai' package is required for Stage2 LLM extraction. Install: pip install openai"
         ) from e
 
     excerpt = _serialize_blocks_for_prompt(page_blocks)

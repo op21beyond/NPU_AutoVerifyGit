@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.metadata
+import os
 import re
 import sys
 import tempfile
@@ -10,6 +11,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 import fitz
 
+from src.common.page_range import resolve_page_range
 from src.common.runtime import StageRun
 from src.stage1_ingestion.table_merge import expand_bbox_to_page_width, merge_table_bboxes
 from src.stage1_ingestion.heading_preservation import (
@@ -883,7 +885,13 @@ def try_extract_table_text_pdfplumber(
         return None
 
 
-def extract_pymupdf4llm_corpus(pdf_path: Path, max_chars_per_chunk: int = 6000) -> Dict[str, Any]:
+def extract_pymupdf4llm_corpus(
+    pdf_path: Path,
+    max_chars_per_chunk: int = 6000,
+    *,
+    page_start: Optional[int] = None,
+    page_end: Optional[int] = None,
+) -> Dict[str, Any]:
     """
     Build a lightweight supplemental text corpus using pymupdf4llm.
     This is intended for Stage2 recall boost, not bbox-accurate extraction.
@@ -896,7 +904,34 @@ def extract_pymupdf4llm_corpus(pdf_path: Path, max_chars_per_chunk: int = 6000) 
             "Install it with: pip install pymupdf4llm"
         ) from e
 
-    markdown = pymupdf4llm.to_markdown(str(pdf_path))
+    first: int
+    last: int
+    doc = fitz.open(pdf_path)
+    try:
+        total = doc.page_count
+        first, last = resolve_page_range(total, page_start, page_end)
+        if first == 1 and last == total:
+            markdown = pymupdf4llm.to_markdown(str(pdf_path))
+        else:
+            subset = fitz.open()
+            try:
+                subset.insert_pdf(doc, from_page=first - 1, to_page=last - 1)
+                tmp_path = ""
+                with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+                    tmp.write(subset.tobytes())
+                    tmp_path = tmp.name
+                try:
+                    markdown = pymupdf4llm.to_markdown(tmp_path)
+                finally:
+                    if tmp_path:
+                        try:
+                            os.unlink(tmp_path)
+                        except OSError:
+                            pass
+            finally:
+                subset.close()
+    finally:
+        doc.close()
     if not isinstance(markdown, str):
         markdown = str(markdown)
 
@@ -958,6 +993,8 @@ def extract_page_blocks(
     cross_page_top_ratio: float = 0.08,
     cross_page_min_width_overlap: float = 0.5,
     preserve_heading: bool = False,
+    page_start: Optional[int] = None,
+    page_end: Optional[int] = None,
 ) -> Tuple[List[Dict[str, Any]], List[PageMetrics], Dict[str, Any]]:
     document_id = pdf_path.stem
     all_rows: List[Dict[str, Any]] = []
@@ -977,8 +1014,10 @@ def extract_page_blocks(
             size_to_role_fn = build_size_to_role(_sizes)
 
         total_pages = doc.page_count
+        range_first, range_last = resolve_page_range(total_pages, page_start, page_end)
+        processed_pages = range_last - range_first + 1
         pages_ok = 0
-        for page_index in range(total_pages):
+        for page_index in range(range_first - 1, range_last):
             page = doc[page_index]
             page_number = page_index + 1
             block_counter = 0
@@ -1155,10 +1194,13 @@ def extract_page_blocks(
                 max_chars=repeat_max_chars,
             )
 
-        parse_success_rate = pages_ok / total_pages if total_pages else 1.0
+        parse_success_rate = pages_ok / processed_pages if processed_pages else 1.0
         summary = {
             "document_id": document_id,
             "total_pages": total_pages,
+            "page_range_first": range_first,
+            "page_range_last": range_last,
+            "processed_pages": processed_pages,
             "pages_with_blocks": pages_ok,
             "parse_success_rate": round(parse_success_rate, 4),
             "total_blocks": len(all_rows),

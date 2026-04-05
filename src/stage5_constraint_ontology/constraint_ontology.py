@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List, Set, Tuple
 
+from src.common.instruction_key import catalog_row_key, normalize_variation
 from src.common.runtime import StageRun
 
 
@@ -12,14 +13,20 @@ def _norm_field_id(name: str) -> str:
 
 
 def instruction_node_id(inst: Dict[str, Any]) -> str:
+    """Stable ID without '|' so pipe-delimited Stage5 text GT lines stay unambiguous."""
     opc = inst.get("opcode_value")
     name = str(inst.get("instruction_name", "UNKNOWN")).strip().upper()
+    var = normalize_variation(inst.get("variation"))
     if opc is not None:
         try:
-            return f"Instr:{int(opc)}"
+            base = f"Instr:{int(opc)}"
         except (TypeError, ValueError):
-            pass
-    return f"Instr:{name}"
+            base = f"Instr:{name}"
+    else:
+        base = f"Instr:{name}"
+    if var:
+        return f"{base}_{var}"
+    return base
 
 
 def build_constraint_registry(
@@ -95,6 +102,7 @@ def build_mission_ontology_graph(
                 "type": "Instruction",
                 "id": iid,
                 "instruction_name": str(inst.get("instruction_name", "")).strip().upper(),
+                "variation": normalize_variation(inst.get("variation")),
                 "instruction_kind": str(inst.get("instruction_kind", "unknown")),
                 "opcode_raw": inst.get("opcode_raw"),
                 "opcode_radix": inst.get("opcode_radix"),
@@ -125,18 +133,19 @@ def build_mission_ontology_graph(
         if en:
             add_edge(cnode_id, "APPLIES_TO", f"Field:{en.upper()}")
 
-    inst_by_name: Dict[str, Dict[str, Any]] = {}
+    inst_by_key: Dict[Tuple[str, str], Dict[str, Any]] = {}
     for inst in instructions:
-        n = str(inst.get("instruction_name", "")).strip().upper()
-        if n and n not in inst_by_name:
-            inst_by_name[n] = inst
+        k = catalog_row_key(inst.get("instruction_name"), inst.get("variation"))
+        if k[0] and k not in inst_by_key:
+            inst_by_key[k] = inst
 
     for r in datatype_catalog:
         ins = str(r.get("instruction_name", "")).strip().upper()
         fn = str(r.get("field_name", "")).strip()
         if not fn:
             continue
-        inst = inst_by_name.get(ins)
+        rk = catalog_row_key(ins, r.get("variation"))
+        inst = inst_by_key.get(rk)
         if inst:
             iid = instruction_node_id(inst)
             add_edge(iid, "HAS_FIELD", f"Field:{fn.upper()}")

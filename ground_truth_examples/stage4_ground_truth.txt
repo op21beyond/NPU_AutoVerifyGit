@@ -4,8 +4,10 @@ TYPE|uint6|software_primitive
 TYPE|NPU_TILE_FMT|ip_architecture
 
 # DTYPE|instruction_name|field_name|data_type_ref
+# DTYPE|instruction_name|variation|field_name|data_type_ref  (five parts when variation is set)
 # or DTYPE|field_name|data_type_ref  (instruction omitted)
 DTYPE|ADD|OPCODE|uint6
+DTYPE|RESCALE|CW|MODE|uint6
 DTYPE|SRC0|NPU_TILE_FMT
 
 # DOMAIN|field_name|allowed_value_form|allowed_values_or_range

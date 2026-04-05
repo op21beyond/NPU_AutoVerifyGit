@@ -24,6 +24,7 @@
     - 평가: `python -m src.stage5_constraint_ontology.main --ground-truth ground_truth_examples/stage5_ground_truth.txt`
     - 정답 직접 출력: `python -m src.stage5_constraint_ontology.main --ground-truth-as-output --ground-truth ground_truth_examples/stage5_ground_truth.txt`
   - 텍스트 GT는 `CONSTRAINT|...`, `NODE|...`, `EDGE|from|rel|to` 라인 기반이며 부분 항목만 작성 가능
+  - `Instruction` 노드 id: `Instr:{opcode}` 또는 variation 있으면 **`Instr:{opcode}_{VAR}`** (파이프 구분자와 충돌 없음). `instruction_catalog`의 `variation` 반영
 - 오픈 이슈:
   - 제약 후보 수집/클러스터링 미구현
   - 온톨로지 그래프는 seed 수준

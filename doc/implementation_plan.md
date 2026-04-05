@@ -85,7 +85,7 @@ flowchart TD
   - `page_blocks` (block_type, block_id, page, bbox, raw_text, confidence, `extraction_method`; 선택: `relationships`)
 
 ## Step 2. Instruction Candidate Extraction
-- 명령어 패턴 사전 + LLM tool call로 명령어명 후보 추출
+- 기본: **OpenAI Chat Completions(JSON object)** 로 `instruction_catalog` 생성(`src/stage2_instruction_extraction/llm_openai.py`); 대안: 정답 파일만으로 카탈로그(`--ground-truth-as-catalog`)
 - 중복/동의어 정규화(표기 차이 통합)
 - 명령어별 근거 링크 유지
 - 각 명령에 대해 **OPCODE**(`opcode_raw`, `opcode_radix`, `opcode_value`)·**실행 유닛(`execution_unit`)**·**macro/micro 구분(`instruction_kind`)** 추출(불명확 시 `unknown`/null)

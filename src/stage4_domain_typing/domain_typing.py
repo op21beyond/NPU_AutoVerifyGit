@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Tuple
 
+from src.common.instruction_key import variation_from_catalog_row
 from src.common.runtime import StageRun
 
 
@@ -80,11 +81,13 @@ def build_field_datatype_catalog(fields: List[Dict[str, Any]], run: StageRun) ->
         w = _bit_width_from_range(br)
         tid = _type_id_for_width(w)
         instr = str(row.get("instruction_name", "")).strip().upper()
+        ivar = variation_from_catalog_row(row)
         fname = str(row.get("field_name", "")).strip()
         rows.append(
             {
                 "trace_id": f"{run.stage_run_id}:dtype:{i}",
                 "instruction_name": instr,
+                "variation": ivar,
                 "field_name": fname,
                 "data_type_raw": tid,
                 "data_type_ref": tid,

@@ -2,7 +2,7 @@
 
 ## Plan
 - 목표: PDF 페이지/블록 단위로 텍스트, 표, 이미지 영역을 분리해 후속 단계 입력 생성
-- 입력: Architecture PDF
+- 입력: Architecture PDF (선택 `--page-start` / `--page-end`: 둘 다 없으면 전체; 시작만 → 해당 페이지~끝; 끝만 → 1~해당; 둘 다 → 포함 구간, 문서 길이에 맞게 클램프)
 - 출력: `page_blocks` (필수: page, block_type, block_id, bbox, raw_text, extraction_method, confidence, trace_id 등; 선택: `relationships`)
 - 완료 기준:
   - 페이지 단위 파싱 성공률 보고
@@ -57,6 +57,7 @@
   - Stage 3과 표 블록 품질 공동 검증
 
 ## Technical Note
+- 페이지 범위를 지정하면 `parsing_report.json`에 문서 전체 `total_pages`와 함께 `page_range_first`, `page_range_last`, `processed_pages`(실제 처리한 페이지 수)가 기록되고, `parse_success_rate`는 **처리 구간** 기준으로 계산된다.
 - 텍스트 레이어 우선, 부족 시 OCR 보강 전략
 - 블록 분리 품질이 전체 정확도에 미치는 영향이 크므로 bbox 보존 필수
 - `block_id`로 블록 간 참조; `relationships`로 표-설명-수식 등 연결(각 항목 `type`, `target` = 대상 `block_id`)

@@ -1,8 +1,11 @@
 ﻿# Stage3 ground truth (instruction field map)
-# Format: INSTRUCTION FIELD [BIT_RANGE]
+# Format: INSTR FIELD [BIT_RANGE]
+# With variation (same as Stage2 catalog): INSTR VAR FIELD BIT_RANGE
 ADD OPCODE 31:26
 ADD DST 25:21
 MUL SRC0 20:16
 MUL SRC1
+RESCALE CW OPCODE 31:26
+RESCALE CW MODE 15:8
 
-# BIT_RANGE is optional
+# BIT_RANGE is optional; three tokens without bit pattern = INSTR VAR FIELD

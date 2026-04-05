@@ -13,14 +13,14 @@
 ## Status
 - 상태: Implemented
 - 구현률: ~60%
-- 구현: `instruction_field_map`에서 전역 `canonical_field_names`(공백→`_` 정규화), `field_count_per_instruction`, 빈 `field_alias_map.jsonl`
+- 구현: `instruction_field_map`에서 전역 `canonical_field_names`(공백→`_` 정규화), `field_count_per_instruction`(키: `instruction_name` 또는 **`NAME|VAR`**), 빈 `field_alias_map.jsonl`
 - 오픈 이슈:
   - 동의어·표기 차이 병합·`rapidfuzz` alias 후보 미구현
   - OCR 오타 교정 미구현
 - Ground truth 옵션:
   - `--ground-truth-as-output` + `--ground-truth`로 GT 기반 `global_field_schema.json` 직접 생성
   - `--ground-truth`만 주면 추출 결과를 `evaluation_report.json`로 성능평가
-  - 예시 파일: `ground_truth_examples/stage3b_ground_truth.txt`
+  - 예시 파일: `ground_truth_examples/stage3b_ground_truth.txt`(필드명 한 줄씩), `ground_truth_examples/stage3b_ground_truth.json`(variation별 `field_count_per_instruction` 포함 가능)
     - 평가: `python -m src.stage3b_global_field_schema.main --ground-truth ground_truth_examples/stage3b_ground_truth.txt`
     - 정답 직접 출력: `python -m src.stage3b_global_field_schema.main --ground-truth-as-output --ground-truth ground_truth_examples/stage3b_ground_truth.txt`
   - 텍스트 GT는 canonical field name 한 줄씩 작성(부분 항목만 작성 가능)

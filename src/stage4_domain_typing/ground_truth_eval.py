@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Set, Tuple
 
+from src.common.instruction_key import normalize_variation
 from src.common.runtime import StageRun
 
 
@@ -67,10 +68,20 @@ def load_stage4_ground_truth(path: Path) -> Dict[str, Any]:
                 category = str(vals[1]).strip() if len(vals) >= 2 else "unknown"
                 reg.append({"type_id": type_id, "type_name_raw": type_id, "category": category})
             elif tag == "DTYPE":
-                if len(vals) >= 3:
+                if len(vals) >= 4:
                     dcat.append(
                         {
                             "instruction_name": str(vals[0]).strip().upper(),
+                            "variation": normalize_variation(vals[1]),
+                            "field_name": str(vals[2]).strip(),
+                            "data_type_ref": _norm_type_id(vals[3]),
+                        }
+                    )
+                elif len(vals) >= 3:
+                    dcat.append(
+                        {
+                            "instruction_name": str(vals[0]).strip().upper(),
+                            "variation": None,
                             "field_name": str(vals[1]).strip(),
                             "data_type_ref": _norm_type_id(vals[2]),
                         }
@@ -151,14 +162,19 @@ def _registry_keys(rows: List[Dict[str, Any]]) -> Set[str]:
     return s
 
 
-def _dtype_cat_key(r: Dict[str, Any]) -> Tuple[str, str, str]:
+def _var_key(r: Dict[str, Any]) -> str:
+    v = normalize_variation(r.get("variation"))
+    return v if v is not None else ""
+
+
+def _dtype_cat_key(r: Dict[str, Any]) -> Tuple[str, str, str, str]:
     inst = str(r.get("instruction_name", "")).strip().upper()
     fn = _norm_field(str(r.get("field_name", "")))
     ref = _norm_type_id(str(r.get("data_type_ref", "")))
-    return (inst, fn, ref)
+    return (inst, _var_key(r), fn, ref)
 
 
-def _dtype_keys(rows: List[Dict[str, Any]]) -> Set[Tuple[str, str, str]]:
+def _dtype_keys(rows: List[Dict[str, Any]]) -> Set[Tuple[str, str, str, str]]:
     return {_dtype_cat_key(r) for r in rows if r.get("field_name")}
 
 

@@ -15,6 +15,7 @@ def main() -> None:
         {
             "trace_id": f"{run.stage_run_id}:t0",
             "instruction_name": "NOP_PLACEHOLDER",
+            "variation": None,
             "OPCODE": 0,
             "constraint_satisfaction_status": "assumed_valid",
             "canonical_field_names_ref": _canonical,

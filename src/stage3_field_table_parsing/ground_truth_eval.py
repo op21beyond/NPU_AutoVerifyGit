@@ -5,7 +5,7 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from src.common.opcode import parse_opcode_token
+from src.common.instruction_key import normalize_variation
 from src.common.runtime import StageRun
 
 
@@ -26,15 +26,62 @@ def _norm_bit_range(s: str) -> str:
     return x
 
 
+def _looks_like_bit_token(s: str) -> bool:
+    s = (s or "").strip()
+    if not s:
+        return False
+    if re.match(r"^\d{1,2}:\d{1,2}$", s):
+        return True
+    if re.match(r"^\d{1,2}$", s):
+        return True
+    return False
+
+
+def _parse_instruction_field_text_line(line: str) -> Optional[Dict[str, Any]]:
+    """
+    - INSTR FIELD [BITS]
+    - INSTR VAR FIELD BITS   (four or more tokens; fourth token is bit range)
+    - INSTR VAR FIELD        (three tokens; third is not a bit token — field without bit range)
+    """
+    parts = re.split(r"\s+", line.strip())
+    if len(parts) < 2:
+        return None
+    if len(parts) >= 4 and _looks_like_bit_token(parts[3]):
+        return {
+            "instruction_name": _norm_inst_name(parts[0]),
+            "variation": normalize_variation(parts[1]),
+            "field_name": _norm_field_name(parts[2]),
+            "bit_range": _norm_bit_range(parts[3]),
+        }
+    if len(parts) >= 3 and _looks_like_bit_token(parts[2]):
+        return {
+            "instruction_name": _norm_inst_name(parts[0]),
+            "variation": None,
+            "field_name": _norm_field_name(parts[1]),
+            "bit_range": _norm_bit_range(parts[2]),
+        }
+    if len(parts) == 3:
+        return {
+            "instruction_name": _norm_inst_name(parts[0]),
+            "variation": normalize_variation(parts[1]),
+            "field_name": _norm_field_name(parts[2]),
+        }
+    if len(parts) == 2:
+        return {
+            "instruction_name": _norm_inst_name(parts[0]),
+            "variation": None,
+            "field_name": _norm_field_name(parts[1]),
+        }
+    return None
+
+
 def load_instruction_field_ground_truth(path: Path) -> List[Dict[str, Any]]:
     """
     Supported formats:
-    - .txt / .lst / .list: one record per line. Supported line styles:
-        * INSTR FIELD
-        * INSTR FIELD 31:28
-      (FIELD may not include spaces; for more complex needs use JSON/JSONL)
-    - .json: either array of objects or array of strings (strings ignored except as instruction names).
-    - .jsonl: each line is a JSON object with at least instruction_name + field_name
+    - .txt / .lst / .list: one record per line.
+        * INSTR FIELD [BIT_RANGE]
+        * INSTR VAR FIELD BIT_RANGE  (when four+ tokens and last of first four is a bit pattern)
+    - .json / .jsonl: objects with instruction_name, field_name, optional variation, bit_range, ...
     """
     if not path.is_file():
         raise FileNotFoundError(f"Ground truth file not found: {path}")
@@ -48,21 +95,9 @@ def load_instruction_field_ground_truth(path: Path) -> List[Dict[str, Any]]:
             line = line.strip()
             if not line or line.startswith("#"):
                 continue
-            parts = re.split(r"\s+", line)
-            if len(parts) < 2:
-                continue
-            inst = parts[0]
-            field = parts[1]
-            bit_range = None
-            if len(parts) >= 3:
-                bit_range = parts[2]
-            row: Dict[str, Any] = {
-                "instruction_name": _norm_inst_name(inst),
-                "field_name": _norm_field_name(field),
-            }
-            if bit_range:
-                row["bit_range"] = _norm_bit_range(bit_range)
-            out.append(row)
+            parsed = _parse_instruction_field_text_line(line)
+            if parsed:
+                out.append(parsed)
         return out
 
     if suffix == ".json":
@@ -103,6 +138,7 @@ def _normalize_gt_objects(objs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         row: Dict[str, Any] = {
             "instruction_name": _norm_inst_name(str(inst)),
             "field_name": _norm_field_name(str(field)),
+            "variation": normalize_variation(o.get("variation")),
         }
         if o.get("bit_range") is not None:
             row["bit_range"] = _norm_bit_range(str(o.get("bit_range")))
@@ -128,12 +164,14 @@ def build_instruction_field_map_from_ground_truth(
         bit_range = _norm_bit_range(str(gt.get("bit_range", ""))) if gt.get("bit_range") else ""
         word_index = gt.get("word_index", 0) or 0
         uncertain = bool(gt.get("uncertain", False))
+        var = normalize_variation(gt.get("variation"))
         rows.append(
             {
                 "trace_id": f"{run.stage_run_id}:field:gt:{idx}",
                 "stage_name": run.stage_name,
                 "stage_run_id": run.stage_run_id,
                 "instruction_name": inst,
+                "variation": var,
                 "field_name": field,
                 "bit_range": bit_range,
                 "word_index": int(word_index),
@@ -150,22 +188,28 @@ def evaluate_instruction_field_map_extraction(
     gt_rows: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
     """
-    Field-level precision/recall based on instruction_name + field_name.
+    Field-level precision/recall on (instruction_name, variation, field_name[, bit_range]).
     If GT includes bit_range, bit_range is required for exact match.
     """
     use_bit_range = any(bool(r.get("bit_range")) for r in gt_rows)
 
-    def mk_key(r: Dict[str, Any]) -> Tuple[str, str, Optional[str]]:
+    def mk_key(r: Dict[str, Any]) -> Tuple[str, str, str, Optional[str]]:
         inst = _norm_inst_name(str(r.get("instruction_name", "")))
         field = _norm_field_name(str(r.get("field_name", "")))
+        var = normalize_variation(r.get("variation"))
+        vk = var if var is not None else ""
         br = r.get("bit_range")
         br_norm = _norm_bit_range(str(br)) if br else None
         if use_bit_range:
-            return (inst, field, br_norm)
-        return (inst, field, None)
+            return (inst, vk, field, br_norm)
+        return (inst, vk, field, None)
 
-    gt_keys: Set[Tuple[str, str, Optional[str]]] = {mk_key(r) for r in gt_rows if r.get("instruction_name") and r.get("field_name")}
-    pred_keys: Set[Tuple[str, str, Optional[str]]] = {mk_key(r) for r in pred_rows if r.get("instruction_name") and r.get("field_name")}
+    gt_keys: Set[Tuple[str, str, str, Optional[str]]] = {
+        mk_key(r) for r in gt_rows if r.get("instruction_name") and r.get("field_name")
+    }
+    pred_keys: Set[Tuple[str, str, str, Optional[str]]] = {
+        mk_key(r) for r in pred_rows if r.get("instruction_name") and r.get("field_name")
+    }
 
     tp = len(gt_keys & pred_keys)
     fp = len(pred_keys - gt_keys)

@@ -50,7 +50,7 @@ def main() -> None:
                 "instruction_count_input": None,
                 "ground_truth_path": str(gt_path.resolve()),
                 "ground_truth_as_output": True,
-                "output_schema_version": "instruction_field_map@1",
+                "output_schema_version": "instruction_field_map@2",
             },
         )
         write_json(artifact_path("stage3_field_table_parsing", "run_manifest.json"), run.to_dict())
@@ -72,7 +72,7 @@ def main() -> None:
             "field_row_count": len(rows),
             "instruction_count_input": len(instructions),
             "ground_truth_as_output": False,
-            "output_schema_version": "instruction_field_map@1",
+            "output_schema_version": "instruction_field_map@2",
         },
     )
 

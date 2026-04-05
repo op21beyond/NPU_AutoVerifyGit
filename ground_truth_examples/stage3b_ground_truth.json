@@ -1,0 +1,8 @@
+{
+  "canonical_field_names": ["DST", "IMM", "MODE", "OPCODE", "SRC0", "SRC1"],
+  "field_count_per_instruction": {
+    "ADD": ["OPCODE", "DST"],
+    "MUL": ["SRC0", "SRC1"],
+    "RESCALE|CW": ["MODE", "OPCODE"]
+  }
+}

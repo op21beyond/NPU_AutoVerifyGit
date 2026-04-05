@@ -14,6 +14,10 @@
       "type": "string",
       "description": "필드가 속한 명령(스코프가 있을 때)."
     },
+    "variation": {
+      "type": ["string", "null"],
+      "description": "instruction_catalog.variation 과 동일; 없으면 null."
+    },
     "field_name": { "type": "string" },
     "data_type_raw": {
       "type": "string",

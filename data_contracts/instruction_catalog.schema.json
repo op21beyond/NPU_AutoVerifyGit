@@ -21,6 +21,10 @@
     "stage_name": { "type": "string" },
     "stage_run_id": { "type": "string" },
     "instruction_name": { "type": "string" },
+    "variation": {
+      "type": ["string", "null"],
+      "description": "동일 instruction_name 내 레이아웃/니모닉 구분자(예: CW, GW). 단일 형태면 null."
+    },
     "aliases": { "type": "array", "items": { "type": "string" } },
     "opcode_raw": {
       "type": "string",

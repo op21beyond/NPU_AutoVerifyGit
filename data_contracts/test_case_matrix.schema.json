@@ -6,6 +6,10 @@
   "properties": {
     "trace_id": { "type": "string" },
     "instruction_name": { "type": "string" },
+    "variation": {
+      "type": ["string", "null"],
+      "description": "instruction_catalog와 동일한 구분자(선택)."
+    },
     "constraint_satisfaction_status": { "type": "string" }
   },
   "additionalProperties": true

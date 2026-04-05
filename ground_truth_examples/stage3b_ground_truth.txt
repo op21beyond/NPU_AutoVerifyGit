@@ -1,6 +1,9 @@
-﻿# Stage3b ground truth (canonical field names)
+﻿# Stage3b ground truth (canonical field names, one per line)
+# For per-instruction field sets with variation, use stage3b_ground_truth.json
+# (keys: instruction_name or NAME|VAR)
 OPCODE
 DST
 SRC0
 SRC1
 IMM
+MODE

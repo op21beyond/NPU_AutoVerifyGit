@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Set
 
 from src.common.contracts import load_jsonl, write_json, write_jsonl
+from src.common.instruction_key import instruction_scope_label, variation_from_catalog_row
 from src.common.runtime import StageRun, artifact_path
 
 from src.stage3b_global_field_schema.ground_truth_eval import (
@@ -63,9 +64,11 @@ def main() -> None:
         fn = _canonical_field_name(raw_fn) if raw_fn else ""
         if fn:
             names.add(fn)
-            ins = row.get("instruction_name", "")
+            ins = str(row.get("instruction_name", "")).strip()
             if ins:
-                per_instruction[ins].add(fn)
+                ivar = variation_from_catalog_row(row)
+                scope = instruction_scope_label(ins, ivar)
+                per_instruction[scope].add(fn)
 
     canonical = sorted(names)
     schema: Dict[str, Any] = {

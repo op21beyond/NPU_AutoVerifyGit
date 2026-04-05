@@ -13,8 +13,10 @@ pdfplumber>=0.11.0
 # - GPU: pip install paddlepaddle-gpu  (match CUDA version per Paddle install docs)
 paddleocr>=2.7.0
 
-# Stage 2 optional: --extractor openai (set OPENAI_API_KEY)
+# Stage 2: OpenAI extraction (set OPENAI_API_KEY) unless --ground-truth-as-catalog
 openai>=1.40.0
+# Stage 2: default page_coverage.png
+matplotlib>=3.8.0
 
 # Stage 1 optional: supplemental markdown corpus for Stage 2 recall boost
 pymupdf4llm>=0.0.17

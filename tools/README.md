@@ -2,6 +2,20 @@
 
 파이프라인에 직접 포함되지 않지만 개발·검증에 쓰는 스크립트와 앱을 둡니다.
 
+## `page_coverage_viewer`
+
+Stage 2가 생성하는 `page_coverage.json`을 **줌/브러시** 가능한 막대 차트로 봅니다(긴 문서용). 기본 PNG와 동일 데이터입니다.
+
+**요구:** Node.js(LTS 권장) + npm — `pip`으로 설치하지 않습니다. (`tools/requirements-tools.txt` 주석 참고.)
+
+```bash
+cd tools/page_coverage_viewer
+npm install
+npm run dev
+```
+
+브라우저에서 `artifacts/stage2_instruction_extraction/page_coverage.json`을 파일 선택으로 엽니다. 자세한 설명은 [`tools/page_coverage_viewer/README.md`](page_coverage_viewer/README.md).
+
 ## `streamlit_llm_chat`
 
 회사 원격 LLM(최대 5종, OpenAI 호환 Chat Completions)과 Stage1 `page_blocks.jsonl`을 연결하는 챗 UI입니다.

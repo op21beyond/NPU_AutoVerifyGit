@@ -13,7 +13,7 @@
     },
     "field_count_per_instruction": {
       "type": "object",
-      "description": "선택: 명령어별 필드 이름 목록.",
+      "description": "선택: 명령(및 variation)별 필드 이름 목록. 키는 instruction_name 또는 NAME|VAR (variation 있을 때).",
       "additionalProperties": { "type": "array", "items": { "type": "string" } }
     },
     "alias_catalog": { "type": "string", "description": "별칭 테이블 파일명 참조." }

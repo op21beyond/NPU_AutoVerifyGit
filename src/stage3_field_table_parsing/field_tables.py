@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List, Set, Tuple
 
+from src.common.instruction_key import instruction_scope_label, variation_from_catalog_row
 from src.common.runtime import StageRun
 
 _RE_BIT_RANGE = re.compile(r"\b(\d{1,2})\s*:\s*(\d{1,2})\b")
@@ -185,16 +186,19 @@ def build_instruction_field_map(
 
         uncertain = multi or btype != "table"
         for inst in inst_rows:
-            iname = inst.get("instruction_name", "UNKNOWN")
+            iname = str(inst.get("instruction_name", "UNKNOWN")).strip().upper()
+            ivar = variation_from_catalog_row(inst)
+            scope = instruction_scope_label(iname, ivar)
             for fi, (fname, br, wi, row_cf) in enumerate(parsed):
                 base = 0.55 if uncertain else row_cf
                 conf = min(0.95, max(0.25, base * (0.9 if multi else 1.0)))
                 rows.append(
                     {
-                        "trace_id": f"{run.stage_run_id}:field:{block_idx}:{fi}:{iname}",
+                        "trace_id": f"{run.stage_run_id}:field:{block_idx}:{fi}:{scope}",
                         "stage_name": run.stage_name,
                         "stage_run_id": run.stage_run_id,
                         "instruction_name": iname,
+                        "variation": ivar,
                         "field_name": fname,
                         "bit_range": br,
                         "word_index": wi,

@@ -43,6 +43,20 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Stage1: PDF ingestion and page/block segmentation")
     parser.add_argument("--input-pdf", required=True, help="Path to Architecture PDF")
     parser.add_argument(
+        "--page-start",
+        type=int,
+        default=None,
+        metavar="N",
+        help="First page to process (1-based). If omitted with no --page-end, all pages.",
+    )
+    parser.add_argument(
+        "--page-end",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Last page to process (1-based). If omitted with no --page-start, all pages.",
+    )
+    parser.add_argument(
         "--min-chars-ocr",
         type=int,
         default=40,
@@ -278,6 +292,8 @@ def main() -> None:
         cross_page_top_ratio=args.cross_page_top_ratio,
         cross_page_min_width_overlap=args.cross_page_min_width_overlap,
         preserve_heading=args.preserve_heading,
+        page_start=args.page_start,
+        page_end=args.page_end,
     )
 
     out = artifact_path("stage1_ingestion", "page_blocks.jsonl")
@@ -318,7 +334,11 @@ def main() -> None:
         "output_schema_version": "page_blocks@1",
     }
     if args.text_backend in ("pymupdf4llm", "hybrid"):
-        corpus = extract_pymupdf4llm_corpus(pdf_path)
+        corpus = extract_pymupdf4llm_corpus(
+            pdf_path,
+            page_start=args.page_start,
+            page_end=args.page_end,
+        )
         corpus_path = artifact_path("stage1_ingestion", "pymupdf4llm_corpus.json")
         write_json(corpus_path, corpus)
         parsing_report["supplemental_text_corpus"] = str(corpus_path)

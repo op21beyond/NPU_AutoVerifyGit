@@ -22,6 +22,7 @@
     - 평가: `python -m src.stage4_domain_typing.main --ground-truth ground_truth_examples/stage4_ground_truth.txt`
     - 정답 직접 출력: `python -m src.stage4_domain_typing.main --ground-truth-as-output --ground-truth ground_truth_examples/stage4_ground_truth.txt`
   - 텍스트 GT는 `TYPE|...`, `DTYPE|...`, `DOMAIN|...` 라인 기반이며 일부 필드 생략 입력 허용
+  - `DTYPE`는 `instruction_name|field|type`(variation 없음) 또는 **`instruction_name|variation|field|type`**(다섯 토큰) 지원; 산출 `field_datatype_catalog` 행에 `variation` 포함
 - 오픈 이슈:
   - TRM 본문에서 타입 정의·값 생성 규칙 자동 추출 미구현
   - 동일 타입 명칭의 동의어·별칭 병합 규칙 미정

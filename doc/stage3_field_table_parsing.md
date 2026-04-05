@@ -3,7 +3,7 @@
 ## Plan
 - 목표: 명령어별 필드 구성(필드명/비트/워드/위치)을 표 중심으로 복원
 - 입력: `page_blocks`, `instruction_catalog`
-- 출력: `instruction_field_map` (instruction, field_name, bit_range, word_index, source_refs, confidence)
+- 출력: `instruction_field_map@2` (`instruction_name`, **`variation`**(nullable, Stage2와 동일), `field_name`, `bit_range`, …)
 - 완료 기준:
   - 이미지 표 셀 복원 로직 포함
   - 불완전 추출 항목 `uncertain` 표기
@@ -21,7 +21,7 @@
   - 예시 파일: `ground_truth_examples/stage3_ground_truth.txt`
     - 평가: `python -m src.stage3_field_table_parsing.main --ground-truth ground_truth_examples/stage3_ground_truth.txt`
     - 정답 직접 출력: `python -m src.stage3_field_table_parsing.main --ground-truth-as-output --ground-truth ground_truth_examples/stage3_ground_truth.txt`
-  - 텍스트 GT는 `INSTR FIELD [BIT_RANGE]` 형식이며 `BIT_RANGE`는 생략 가능(부분 항목 허용)
+  - 텍스트 GT: `INSTR FIELD [BIT_RANGE]` 또는 variation 포함 시 `INSTR VAR FIELD BIT_RANGE`(네 토큰 이상이면 네 번째가 비트 범위). JSON/JSONL에는 `variation` 필드 사용
 - 다음 액션:
   - OCR 표 구조와 행 매핑
   - 실 PDF로 열 인덱스·헤더 튜닝

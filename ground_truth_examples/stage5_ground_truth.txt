@@ -3,12 +3,14 @@
 CONSTRAINT|C_OPCODE_RANGE
 CONSTRAINT|C_SRC0_TILE_FMT
 
-# NODE|node_id
+# NODE|node_id  (instruction nodes: Instr:{opcode} or Instr:{name}; with variation: Instr:{opcode}_{VAR})
 NODE|IP:sample
 NODE|Instr:ADD
+NODE|Instr:42_CW
 NODE|Field:OPCODE
 NODE|Constraint:C_OPCODE_RANGE
 
 # EDGE|from|rel|to
 EDGE|IP:sample|HAS_INSTRUCTION|Instr:ADD
+EDGE|IP:sample|HAS_INSTRUCTION|Instr:42_CW
 EDGE|Constraint:C_OPCODE_RANGE|APPLIES_TO|Field:OPCODE

@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Set
+from typing import Any, Dict, List, Optional, Set, Tuple
 
+from src.common.instruction_key import catalog_row_key, normalize_variation
 from src.common.opcode import parse_opcode_token
 from src.common.runtime import StageRun
 
@@ -91,6 +92,10 @@ def _normalize_gt_objects(objs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         if not name:
             continue
         row: Dict[str, Any] = {"instruction_name": _norm_name(str(name))}
+        if o.get("variation") is not None:
+            nv = normalize_variation(o.get("variation"))
+            if nv is not None:
+                row["variation"] = nv
         if "opcode_value" in o and o["opcode_value"] is not None:
             try:
                 row["opcode_value"] = int(o["opcode_value"])
@@ -134,20 +139,21 @@ def build_instruction_catalog_from_ground_truth(
     run: StageRun,
 ) -> List[Dict[str, Any]]:
     """
-    Build instruction_catalog rows directly from a ground-truth file (skip regex/LLM).
-    Duplicate instruction_name entries keep the last occurrence.
+    Build instruction_catalog rows directly from a ground-truth file (skip OpenAI extraction).
+    Duplicate (instruction_name, variation) entries keep the last occurrence.
     """
-    by_name: Dict[str, Dict[str, Any]] = {}
+    by_key: Dict[Tuple[str, str], Dict[str, Any]] = {}
     for gt in gt_rows:
         n = gt.get("instruction_name")
         if not n:
             continue
-        key = _norm_name(str(n))
-        by_name[key] = gt
+        key = catalog_row_key(n, gt.get("variation"))
+        by_key[key] = gt
 
     rows: List[Dict[str, Any]] = []
-    for idx, name in enumerate(sorted(by_name.keys())):
-        gt = by_name[name]
+    for idx, key in enumerate(sorted(by_key.keys())):
+        gt = by_key[key]
+        name = key[0]
         opc_raw = _opcode_raw_from_gt_entry(gt)
         opc_val, opc_radix = parse_opcode_token(opc_raw)
         if opc_val is None and gt.get("opcode_value") is not None:
@@ -164,12 +170,14 @@ def build_instruction_catalog_from_ground_truth(
             aliases = []
         aliases = [str(a).strip() for a in aliases if str(a).strip()]
 
-        rows.append(
-            {
+        var_out = normalize_variation(gt.get("variation"))
+
+        row_out: Dict[str, Any] = {
                 "trace_id": f"{run.stage_run_id}:gt:{idx}",
                 "stage_name": run.stage_name,
                 "stage_run_id": run.stage_run_id,
                 "instruction_name": name,
+                "variation": var_out,
                 "aliases": aliases,
                 "opcode_raw": opc_raw,
                 "opcode_radix": opc_radix,
@@ -179,24 +187,36 @@ def build_instruction_catalog_from_ground_truth(
                 "instruction_kind_confidence": 1.0,
                 "confidence_score": 1.0,
                 "source_refs": [{"method": "ground_truth_catalog", "ground_truth": True}],
-            }
-        )
+        }
+        rows.append(row_out)
     return rows
 
 
-def _pred_name_set(rows: List[Dict[str, Any]]) -> Set[str]:
-    return {_norm_name(str(r.get("instruction_name", ""))) for r in rows if r.get("instruction_name")}
+def _pred_key_map(rows: List[Dict[str, Any]]) -> Dict[Tuple[str, str], Dict[str, Any]]:
+    m: Dict[Tuple[str, str], Dict[str, Any]] = {}
+    for r in rows:
+        n = r.get("instruction_name")
+        if not n:
+            continue
+        k = catalog_row_key(n, r.get("variation"))
+        m.setdefault(k, r)
+    return m
 
 
-def _gt_name_map(entries: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
-    m: Dict[str, Dict[str, Any]] = {}
+def _gt_key_map(entries: List[Dict[str, Any]]) -> Dict[Tuple[str, str], Dict[str, Any]]:
+    m: Dict[Tuple[str, str], Dict[str, Any]] = {}
     for e in entries:
         n = e.get("instruction_name")
         if not n:
             continue
-        key = _norm_name(str(n))
-        m[key] = e
+        k = catalog_row_key(n, e.get("variation"))
+        m[k] = e
     return m
+
+
+def _key_to_label(k: Tuple[str, str]) -> Dict[str, Any]:
+    name, var = k
+    return {"instruction_name": name, "variation": var if var else None}
 
 
 def evaluate_instruction_extraction(
@@ -204,29 +224,23 @@ def evaluate_instruction_extraction(
     ground_truth: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
     """
-    Compare predicted instruction_catalog rows to ground truth (by instruction_name).
+    Compare predicted instruction_catalog rows to ground truth by (instruction_name, variation).
+    GT rows without `variation` match predictions with null/empty variation only.
     Optional opcode_value check when present in ground truth.
     """
-    gt_map = _gt_name_map(ground_truth)
-    gt_names = set(gt_map.keys())
+    gt_map = _gt_key_map(ground_truth)
+    gt_keys = set(gt_map.keys())
 
-    pred_by_name: Dict[str, Dict[str, Any]] = {}
-    for r in predicted_rows:
-        n = r.get("instruction_name")
-        if not n:
-            continue
-        key = _norm_name(str(n))
-        pred_by_name.setdefault(key, r)
+    pred_map = _pred_key_map(predicted_rows)
+    pred_keys = set(pred_map.keys())
 
-    pred_names = set(pred_by_name.keys())
+    tp_keys = sorted(pred_keys & gt_keys)
+    fp_keys = sorted(pred_keys - gt_keys)
+    fn_keys = sorted(gt_keys - pred_keys)
 
-    tp_names = sorted(pred_names & gt_names)
-    fp_names = sorted(pred_names - gt_names)
-    fn_names = sorted(gt_names - pred_names)
-
-    tp = len(tp_names)
-    pred_n = len(pred_names)
-    gt_n = len(gt_names)
+    tp = len(tp_keys)
+    pred_n = len(pred_keys)
+    gt_n = len(gt_keys)
 
     precision = tp / pred_n if pred_n else (1.0 if gt_n == 0 else 0.0)
     recall = tp / gt_n if gt_n else 1.0
@@ -238,9 +252,9 @@ def evaluate_instruction_extraction(
     opcode_checks: List[Dict[str, Any]] = []
     opcode_defined = 0
     opcode_matches = 0
-    for name in tp_names:
-        g = gt_map.get(name) or {}
-        p = pred_by_name.get(name) or {}
+    for k in tp_keys:
+        g = gt_map.get(k) or {}
+        p = pred_map.get(k) or {}
         ev = g.get("opcode_value")
         if ev is None:
             continue
@@ -249,9 +263,10 @@ def evaluate_instruction_extraction(
         match = pv is not None and int(ev) == int(pv)
         if match:
             opcode_matches += 1
+        lab = _key_to_label(k)
         opcode_checks.append(
             {
-                "instruction_name": name,
+                **lab,
                 "expected_opcode_value": ev,
                 "predicted_opcode_value": pv,
                 "opcode_match": match,
@@ -261,8 +276,8 @@ def evaluate_instruction_extraction(
     return {
         "metrics": {
             "true_positive_count": tp,
-            "false_positive_count": len(fp_names),
-            "false_negative_count": len(fn_names),
+            "false_positive_count": len(fp_keys),
+            "false_negative_count": len(fn_keys),
             "predicted_distinct_count": pred_n,
             "ground_truth_count": gt_n,
             "precision": round(precision, 6),
@@ -272,8 +287,8 @@ def evaluate_instruction_extraction(
             "opcode_value_matches": opcode_matches,
             "opcode_value_recall": round(opcode_matches / opcode_defined, 6) if opcode_defined else None,
         },
-        "true_positives": tp_names,
-        "false_positives": fp_names,
-        "false_negatives": fn_names,
+        "true_positives": [_key_to_label(k) for k in tp_keys],
+        "false_positives": [_key_to_label(k) for k in fp_keys],
+        "false_negatives": [_key_to_label(k) for k in fn_keys],
         "opcode_per_instruction": opcode_checks,
     }

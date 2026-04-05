@@ -21,6 +21,8 @@ python -m src.stage4_domain_typing.main
 python -m src.stage5_constraint_ontology.main
 ```
 
+Optional **page range** (same semantics for Stage 1 and Stage 2): `--page-start N` and/or `--page-end N` (1-based). Neither → all pages; start only → that page through end of document; end only → page 1 through that page; both → inclusive range (clamped to document length).
+
 Recommended evaluation order (with sample GT files):
 
 ```bash
@@ -41,11 +43,13 @@ Stage 1 (optional hybrid text backend): `python src/stage1_ingestion/main.py --i
 
 Stage 1 also supports **table bbox merge** (default on), optional **full-width x expansion**, **cross-page table merge** (edge-aligned bottom/top blocks), **`<sup>`/`<sub>` tagging** with `--max-subsup-length`, optional **`--preserve-heading`** (font-size role tags in `raw_text`), and **`--export-reading-order pdf|docx|md`**. Use `--table-merge-bypass`, `--text-span-script-bypass`, or `--no-cross-page-table-merge` for comparisons. See [`doc/stage1_ingestion.md`](doc/stage1_ingestion.md).
 
-Stage 2 (optional LLM): set `OPENAI_API_KEY`, then e.g. `python src/stage2_instruction_extraction/main.py --extractor openai --openai-model gpt-4o-mini`. Default is rule-based `--extractor regex`.
+Stage 2 (default OpenAI extraction): set `OPENAI_API_KEY`, then e.g. `python src/stage2_instruction_extraction/main.py --openai-model gpt-4o-mini`. Alternative: `--ground-truth-as-catalog --ground-truth PATH` skips the API and builds the catalog from a reference file only.
 
 Stage 2 (optional supplemental text from Stage 1): auto-loads `artifacts/stage1_ingestion/pymupdf4llm_corpus.json` if present. Override via `--supplemental-text-corpus PATH`, disable via `--disable-default-supplemental-text`.
 
 Stage 2 (evaluate vs reference list): `python src/stage2_instruction_extraction/main.py --ground-truth path/to/instructions.txt` — writes `artifacts/stage2_instruction_extraction/evaluation_report.json` (precision/recall/F1).
+
+Stage 2 (page coverage, OpenAI path by default): writes `artifacts/stage2_instruction_extraction/page_coverage.json` and `page_coverage.png` (needs **`matplotlib`** from `requirements.txt`). Disable with `--no-page-coverage`. Interactive chart: **`tools/page_coverage_viewer`** (requires **Node.js** + `npm install`; see [`tools/page_coverage_viewer/README.md`](tools/page_coverage_viewer/README.md)).
 
 ## Ground Truth Quickstart
 
@@ -83,6 +87,8 @@ Run the integration skeleton:
 python src/integration_pipeline/main.py --input-pdf "path/to/architecture.pdf"
 ```
 
+Optional page slice (passed to Stage 1 and Stage 2): `--page-start N` and/or `--page-end N` — same semantics as individual stages (see Quick start above).
+
 Artifacts are written to `artifacts/`.
 
 ## Tools
@@ -90,6 +96,8 @@ Artifacts are written to `artifacts/`.
 The [`tools/`](tools/) folder holds **optional utilities** that are not part of the main stage pipeline—small apps and scripts for development, manual testing, and ad-hoc LLM experiments.
 
 - **`streamlit_llm_chat`**: Streamlit UI that connects to up to five company remote LLMs (OpenAI-compatible Chat Completions, configured via `COMPANY_LLM_1` … `COMPANY_LLM_5` env vars), loads Stage1 **`page_blocks.jsonl`**, builds a **`selected_page_blocks`** map from a one-line page/block selector, and sends System/User prompts (single- or multi-turn). Install extras with `pip install -r tools/requirements-tools.txt`, then run `streamlit run tools/streamlit_llm_chat/app.py` from the repo root.
+
+- **`page_coverage_viewer`**: Vite + React chart for Stage 2 `page_coverage.json` (zoom with brush; complements default `page_coverage.png`). **Dependency:** Node.js (LTS 권장) + npm — not installed via `pip`. See [`tools/page_coverage_viewer/README.md`](tools/page_coverage_viewer/README.md).
 
 Full details, selector syntax, and environment variables: **[`tools/README.md`](tools/README.md)**.
 
