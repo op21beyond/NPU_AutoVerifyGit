@@ -5,6 +5,7 @@ import os
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
+from src.common.llm_page_blocks import serialize_page_blocks_for_prompt
 from src.common.opcode import parse_opcode_token
 from src.common.runtime import StageRun
 from src.common.instruction_key import catalog_row_key, normalize_variation
@@ -34,29 +35,6 @@ Rules:
 - source_page must match one of the page numbers shown in the excerpt headers.
 - Prefer fewer, higher-quality rows over noisy duplicates. Emit separate rows for different (instruction_name, variation) pairs.
 """
-
-
-def _serialize_blocks_for_prompt(page_blocks: List[Dict[str, Any]], max_total_chars: int = 100_000) -> str:
-    chunks: List[str] = []
-    used = 0
-    for b in page_blocks:
-        page = b.get("page", "?")
-        bid = b.get("block_id", "?")
-        btype = b.get("block_type", "?")
-        raw = (b.get("raw_text") or "").strip()
-        if not raw:
-            continue
-        cap = 8000
-        if used + len(raw) > max_total_chars:
-            cap = max(0, max_total_chars - used)
-            raw = raw[:cap] + ("\n...[truncated]" if len(raw) > cap else "")
-        header = f"--- page={page} block_id={bid} type={btype} ---\n"
-        piece = header + raw + "\n"
-        if used + len(piece) > max_total_chars:
-            break
-        chunks.append(piece)
-        used += len(piece)
-    return "\n".join(chunks) if chunks else "(no text blocks)"
 
 
 def _clamp_kind(raw: Any) -> str:
@@ -171,7 +149,7 @@ def build_instruction_catalog_openai(
             "The 'openai' package is required for Stage2 LLM extraction. Install: pip install openai"
         ) from e
 
-    excerpt = _serialize_blocks_for_prompt(page_blocks)
+    excerpt = serialize_page_blocks_for_prompt(page_blocks)
     user_msg = (
         "Extract instruction catalog entries from the following document excerpts.\n\n" + excerpt
     )

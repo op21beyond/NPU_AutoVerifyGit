@@ -1,0 +1,3 @@
+{"instruction_name": "ADD", "variation": null, "field_name": "OPCODE", "data_type_ref": "uint6", "trace_id": "stage4b_field_datatype_catalog-0d5955604538:dtype:0", "source_refs": []}
+{"instruction_name": "RESCALE", "variation": "CW", "field_name": "MODE", "data_type_ref": "uint6", "trace_id": "stage4b_field_datatype_catalog-0d5955604538:dtype:1", "source_refs": []}
+{"field_name": "SRC0", "data_type_ref": "NPU_TILE_FMT", "trace_id": "stage4b_field_datatype_catalog-0d5955604538:dtype:2", "source_refs": []}

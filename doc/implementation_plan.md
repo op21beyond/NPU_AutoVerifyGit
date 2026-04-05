@@ -254,6 +254,8 @@ flowchart TD
 - `src/stage3_field_table_parsing`
 - `src/stage3b_global_field_schema`
 - `src/stage4_domain_typing`
+- `src/stage4b_field_datatype_catalog`
+- `src/stage4c_field_domain_catalog`
 - `src/stage5_constraint_ontology`
 - `src/stage6_combination_generation`
 - `src/stage7_validation_reporting`

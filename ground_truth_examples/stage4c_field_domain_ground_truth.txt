@@ -1,0 +1,7 @@
+# Stage4c only: field_domain_catalog (DOMAIN lines)
+# Eval / GT-as-output for: python -m src.stage4c_field_domain_catalog.main
+
+# DOMAIN|field_name|allowed_value_form|allowed_values_or_range
+# or DOMAIN|field_name|allowed_values_or_range  (form defaults to range)
+DOMAIN|OPCODE|range|0..63
+DOMAIN|SRC0|enum{TILE_A,TILE_B}

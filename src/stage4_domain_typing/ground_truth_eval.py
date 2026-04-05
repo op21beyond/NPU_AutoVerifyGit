@@ -153,6 +153,21 @@ def build_stage4_outputs_from_ground_truth(gt: Dict[str, Any], run: StageRun) ->
     return reg, dcat, dom
 
 
+def build_datatype_registry_only_from_ground_truth(gt: Dict[str, Any], run: StageRun) -> List[Dict[str, Any]]:
+    """Stage4 output: datatype_registry rows only."""
+    return _ensure_trace_ids(list(gt.get("datatype_registry") or []), run, "reg")
+
+
+def build_field_datatype_catalog_only_from_ground_truth(gt: Dict[str, Any], run: StageRun) -> List[Dict[str, Any]]:
+    """Stage4b output: field_datatype_catalog rows only."""
+    return _ensure_trace_ids(list(gt.get("field_datatype_catalog") or []), run, "dtype")
+
+
+def build_field_domain_catalog_only_from_ground_truth(gt: Dict[str, Any], run: StageRun) -> List[Dict[str, Any]]:
+    """Stage4c output: field_domain_catalog rows only."""
+    return _ensure_trace_ids(list(gt.get("field_domain_catalog") or []), run, "domain")
+
+
 def _registry_keys(rows: List[Dict[str, Any]]) -> Set[str]:
     s: Set[str] = set()
     for r in rows:

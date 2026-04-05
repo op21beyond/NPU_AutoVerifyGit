@@ -1,28 +1,143 @@
 {
   "nodes": [
     {
-      "id": "IP:sample"
+      "type": "IP",
+      "id": "IP:sample",
+      "ip_name": "sample",
+      "ip_type": "npu",
+      "ip_version": "v0"
     },
     {
-      "id": "Instr:ADD"
+      "type": "ExecutionUnit",
+      "id": "EU:UNKNOWN_UNIT",
+      "name": "UNKNOWN_UNIT"
     },
     {
-      "id": "Field:OPCODE"
+      "type": "Instruction",
+      "id": "Instr:ADD",
+      "instruction_name": "ADD",
+      "variation": null,
+      "instruction_kind": "unknown",
+      "opcode_raw": "UNKNOWN",
+      "opcode_radix": "unknown",
+      "opcode_value": null
     },
     {
-      "id": "Constraint:C_OPCODE_RANGE"
+      "type": "Instruction",
+      "id": "Instr:LOAD",
+      "instruction_name": "LOAD",
+      "variation": null,
+      "instruction_kind": "unknown",
+      "opcode_raw": "UNKNOWN",
+      "opcode_radix": "unknown",
+      "opcode_value": null
+    },
+    {
+      "type": "Instruction",
+      "id": "Instr:MUL",
+      "instruction_name": "MUL",
+      "variation": null,
+      "instruction_kind": "unknown",
+      "opcode_raw": "UNKNOWN",
+      "opcode_radix": "unknown",
+      "opcode_value": null
+    },
+    {
+      "type": "Field",
+      "id": "Field:MODE",
+      "name": "MODE"
+    },
+    {
+      "type": "Field",
+      "id": "Field:OPCODE",
+      "name": "OPCODE"
+    },
+    {
+      "type": "Field",
+      "id": "Field:SRC0",
+      "name": "SRC0"
+    },
+    {
+      "type": "DataType",
+      "id": "DT:NPU_TILE_FMT",
+      "type_id": "NPU_TILE_FMT"
+    },
+    {
+      "type": "DataType",
+      "id": "DT:uint6",
+      "type_id": "uint6"
+    },
+    {
+      "type": "Constraint",
+      "id": "Constraint:C_OPCODE_0000",
+      "constraint_id": "C_OPCODE_0000"
+    },
+    {
+      "type": "Constraint",
+      "id": "Constraint:C_SRC0_0001",
+      "constraint_id": "C_SRC0_0001"
     }
   ],
   "edges": [
+    {
+      "from": "Constraint:C_OPCODE_0000",
+      "rel": "APPLIES_TO",
+      "to": "Field:OPCODE"
+    },
+    {
+      "from": "Constraint:C_SRC0_0001",
+      "rel": "APPLIES_TO",
+      "to": "Field:SRC0"
+    },
+    {
+      "from": "Field:MODE",
+      "rel": "HAS_DATATYPE",
+      "to": "DT:uint6"
+    },
+    {
+      "from": "Field:OPCODE",
+      "rel": "HAS_DATATYPE",
+      "to": "DT:uint6"
+    },
+    {
+      "from": "Field:SRC0",
+      "rel": "HAS_DATATYPE",
+      "to": "DT:NPU_TILE_FMT"
+    },
     {
       "from": "IP:sample",
       "rel": "HAS_INSTRUCTION",
       "to": "Instr:ADD"
     },
     {
-      "from": "Constraint:C_OPCODE_RANGE",
-      "rel": "APPLIES_TO",
+      "from": "IP:sample",
+      "rel": "HAS_INSTRUCTION",
+      "to": "Instr:LOAD"
+    },
+    {
+      "from": "IP:sample",
+      "rel": "HAS_INSTRUCTION",
+      "to": "Instr:MUL"
+    },
+    {
+      "from": "Instr:ADD",
+      "rel": "EXECUTES_ON",
+      "to": "EU:UNKNOWN_UNIT"
+    },
+    {
+      "from": "Instr:ADD",
+      "rel": "HAS_FIELD",
       "to": "Field:OPCODE"
+    },
+    {
+      "from": "Instr:LOAD",
+      "rel": "EXECUTES_ON",
+      "to": "EU:UNKNOWN_UNIT"
+    },
+    {
+      "from": "Instr:MUL",
+      "rel": "EXECUTES_ON",
+      "to": "EU:UNKNOWN_UNIT"
     }
   ]
 }

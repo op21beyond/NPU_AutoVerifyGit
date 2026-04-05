@@ -1,0 +1,17 @@
+{
+  "_comment": "Optional Stage3 override: keys are instruction scopes (NAME or NAME|VAR). Omitted scopes use table/heuristic extraction.",
+  "CONV": {
+    "fields": [
+      { "field_name": "opcode", "bit_range": "31:24", "word_index": 0 },
+      { "field_name": "src_addr", "bit_range": "23:16", "word_index": 0 },
+      { "field_name": "dst_addr", "bit_range": "15:8", "word_index": 0 },
+      { "field_name": "flags", "bit_range": "7:0", "word_index": 0 }
+    ]
+  },
+  "LOAD|CW": {
+    "fields": [
+      { "field_name": "base", "bit_range": "31:16", "word_index": 0 },
+      { "field_name": "offset", "bit_range": "15:0", "word_index": 0 }
+    ]
+  }
+}

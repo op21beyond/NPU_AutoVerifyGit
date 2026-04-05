@@ -1,0 +1,8 @@
+# Stage4b only: field_datatype_catalog (DTYPE lines)
+# Eval / GT-as-output for: python -m src.stage4b_field_datatype_catalog.main
+
+# DTYPE|instruction_name|field_name|data_type_ref
+# DTYPE|instruction_name|variation|field_name|data_type_ref  (five tokens when variation is set)
+DTYPE|ADD|OPCODE|uint6
+DTYPE|RESCALE|CW|MODE|uint6
+DTYPE|SRC0|NPU_TILE_FMT

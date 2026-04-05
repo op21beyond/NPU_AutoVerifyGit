@@ -1,0 +1,6 @@
+{
+  "stage_run_id": "stage4b_field_datatype_catalog-0d5955604538",
+  "mode": "ground_truth_as_output",
+  "row_count": 3,
+  "ground_truth_path": "D:\\Users\\op21b\\NPU_AutoVerify\\ground_truth_examples\\stage4b_field_datatype_ground_truth.txt"
+}

@@ -7,12 +7,20 @@
 - `src/stage3_field_table_parsing`
 - `src/stage3b_global_field_schema`
 - `src/stage4_domain_typing`
+- `src/stage4b_field_datatype_catalog`
+- `src/stage4c_field_domain_catalog`
 - `src/stage5_constraint_ontology`
 - `src/stage6_combination_generation`
 - `src/stage7_validation_reporting`
 - `src/integration_pipeline`
+- `src/common` (공통: `rag_index_faiss.py`, `rag_resolve.py`, `rag_cli.py` 등 RAG 보조)
 - `experiments/`
 - `data_contracts/`
+
+## 선택 산출물 (RAG / 그래프 DB)
+
+- Stage1: `artifacts/stage1_ingestion/rag_index/` — FAISS + 메타데이터(`--build-rag-index`, `OPENAI_API_KEY`).
+- Stage5: `artifacts/stage5_constraint_ontology/mission_graph_kuzu/graph.kuzu` — Kuzu 임베디드 그래프 DB(기본 내보내기; `--skip-kuzu-graph-db`로 생략).
 
 ## Interface Rules
 

@@ -1,0 +1,5 @@
+# Stage4 only: datatype_registry (TYPE lines)
+# Eval / GT-as-output for: python -m src.stage4_domain_typing.main
+
+TYPE|uint6|software_primitive
+TYPE|NPU_TILE_FMT|ip_architecture

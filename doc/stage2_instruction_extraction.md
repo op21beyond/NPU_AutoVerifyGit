@@ -16,6 +16,7 @@
 - 보강 입력: `--supplemental-text-corpus PATH` — Stage1 `pymupdf4llm_corpus.json`을 읽어 pseudo block으로 합쳐 LLM 입력 recall을 보강. 미지정 시 기본 경로(`artifacts/stage1_ingestion/pymupdf4llm_corpus.json`) 자동 탐지(해제: `--disable-default-supplemental-text`)
 - 정답 직접 출력: `--ground-truth-as-catalog` + `--ground-truth PATH` — OpenAI 추출을 건너뛰고 정답 파일만으로 `instruction_catalog.jsonl` 생성(JSON 객체에 `opcode_raw`/`opcode_value`, 선택 `execution_unit`/`instruction_kind`/`aliases` 지원). 이 모드에서는 `--ground-truth` 성능 평가 리포트를 생략(출력이 정답과 동일)
 - 페이지 커버리지(OpenAI 경로 기본): `page_coverage.json` + `page_coverage.png` — 카탈로그 `source_refs.page` 기준으로 구간 전체(한 히트맵) 집계. 비활성: `--no-page-coverage`. 인터랙티브 확인: `tools/page_coverage_viewer`(JSON 로드·브러시 줌).
+- 선택 **RAG**: Stage1에서 `--build-rag-index`로 만든 FAISS 인덱스를 쓰려면 `--use-rag` (+ 선택 `--rag-index-dir`, `--rag-top-k`, `--rag-query`, `--rag-embedding-model`). LLM 직전에 `page_blocks`를 검색 상위 k블록으로 축소; `extraction_summary.json`의 `rag`에 통계. 상세: [`doc/rag_integration_checklist.md`](rag_integration_checklist.md).
 - 예시 파일: `ground_truth_examples/stage2_ground_truth.txt`
   - 평가: `python -m src.stage2_instruction_extraction.main --ground-truth ground_truth_examples/stage2_ground_truth.txt`
   - 정답 직접 출력: `python -m src.stage2_instruction_extraction.main --ground-truth-as-catalog --ground-truth ground_truth_examples/stage2_ground_truth.txt`

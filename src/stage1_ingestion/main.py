@@ -251,6 +251,21 @@ def main() -> None:
         default="",
         help="Output path for --export-reading-order (default: artifact under stage1_ingestion/).",
     )
+    parser.add_argument(
+        "--build-rag-index",
+        action="store_true",
+        help="After extraction, build FAISS + metadata RAG index under artifacts/.../rag_index (requires OPENAI_API_KEY).",
+    )
+    parser.add_argument(
+        "--rag-embedding-model",
+        default="text-embedding-3-small",
+        help="Embedding model for --build-rag-index (default: text-embedding-3-small).",
+    )
+    parser.add_argument(
+        "--rag-openai-base-url",
+        default=None,
+        help="OpenAI-compatible base URL for embeddings only (optional).",
+    )
     args = parser.parse_args()
 
     pdf_path = Path(args.input_pdf)
@@ -349,6 +364,31 @@ def main() -> None:
         _build_ocr_routing_payload(run, parsing_report, metrics_list),
     )
     write_json(artifact_path("stage1_ingestion", "run_manifest.json"), run.to_dict())
+
+    if args.build_rag_index:
+        import os
+
+        from src.common.rag_index_faiss import build_faiss_rag_index
+
+        rag_out = artifact_path("stage1_ingestion", "rag_index")
+        try:
+            manifest = build_faiss_rag_index(
+                rows,
+                Path(rag_out),
+                stage_run_id=run.stage_run_id,
+                embedding_model=args.rag_embedding_model,
+                api_key=os.environ.get("OPENAI_API_KEY"),
+                base_url=args.rag_openai_base_url,
+            )
+            parsing_report["rag_index"] = {
+                "path": str(Path(rag_out).resolve()),
+                "vector_count": manifest.vector_count,
+                "embedding_model": manifest.embedding_model,
+            }
+            write_json(artifact_path("stage1_ingestion", "parsing_report.json"), parsing_report)
+            print(f"RAG FAISS index -> {rag_out} vectors={manifest.vector_count}")
+        except Exception as ex:
+            print(f"WARNING: --build-rag-index failed: {ex}")
 
     print(f"wrote {len(rows)} blocks -> {out}")
     print(

@@ -16,6 +16,28 @@ npm run dev
 
 브라우저에서 `artifacts/stage2_instruction_extraction/page_coverage.json`을 파일 선택으로 엽니다. 자세한 설명은 [`tools/page_coverage_viewer/README.md`](page_coverage_viewer/README.md).
 
+## `ontology_graph_viewer`
+
+Stage5 **`mission_ontology_graph.json`**을 Pyvis(vis.js)로 시각화하는 Streamlit 앱입니다. 사이드바가 아니라 **앱 상단 Expander**에 사용 절차·범례가 있습니다.
+
+```bash
+pip install -r tools/requirements-tools.txt
+streamlit run tools/ontology_graph_viewer/app.py
+```
+
+자세한 설명: [`tools/ontology_graph_viewer/README.md`](ontology_graph_viewer/README.md).
+
+## `rag_graph_chatbot`
+
+Stage1 FAISS RAG 인덱스(`artifacts/.../rag_index`)와 Stage5 Kuzu 그래프(`mission_graph_kuzu/graph.kuzu`)를 묶어 **문서+온톨로지 질의**를 하는 Streamlit 앱입니다. 사이드바에서 경로·모델·RAG top-k·멀티턴을 **session state**로 유지합니다.
+
+```bash
+pip install -r tools/requirements-tools.txt
+streamlit run tools/rag_graph_chatbot/app.py
+```
+
+`OPENAI_API_KEY` 필요(임베딩 검색 + 채팅).
+
 ## `streamlit_llm_chat`
 
 회사 원격 LLM(최대 5종, OpenAI 호환 Chat Completions)과 Stage1 `page_blocks.jsonl`을 연결하는 챗 UI입니다.

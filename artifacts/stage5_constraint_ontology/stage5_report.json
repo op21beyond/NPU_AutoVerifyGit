@@ -1,0 +1,15 @@
+{
+  "stage_run_id": "stage5_constraint_ontology-1724e1a5f460",
+  "constraint_count_domain_derived": 2,
+  "constraint_count_llm": 0,
+  "constraint_count_total": 2,
+  "ontology_node_count": 12,
+  "ontology_edge_count": 12,
+  "value_bindings_count": 0,
+  "page_blocks_path": "D:\\Users\\op21b\\NPU_AutoVerify\\artifacts\\stage1_ingestion\\page_blocks.jsonl",
+  "page_range": null,
+  "openai_model": "gpt-4o-mini",
+  "llm_constraints_ran": false,
+  "llm_values_ran": false,
+  "llm_skip_reason": "skip_llm_constraints_flag"
+}

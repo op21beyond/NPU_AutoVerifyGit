@@ -129,9 +129,19 @@ def build_mission_ontology_graph(
         cnode_id = f"Constraint:{cid}"
         add_node({"type": "Constraint", "id": cnode_id, "constraint_id": cid})
         ap = c.get("applies_to") or {}
+        et = str(ap.get("entity_type", "Field")).strip()
         en = str(ap.get("entity_name", "")).strip()
-        if en:
+        if not en:
+            continue
+        if et == "Field":
             add_edge(cnode_id, "APPLIES_TO", f"Field:{en.upper()}")
+        elif et == "Instruction":
+            for inst in instructions:
+                if str(inst.get("instruction_name", "")).strip().upper() == en.upper():
+                    add_edge(cnode_id, "APPLIES_TO", instruction_node_id(inst))
+                    break
+        elif et == "Document":
+            add_edge(cnode_id, "APPLIES_TO", "IP:sample")
 
     inst_by_key: Dict[Tuple[str, str], Dict[str, Any]] = {}
     for inst in instructions:

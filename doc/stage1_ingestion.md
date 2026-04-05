@@ -14,6 +14,7 @@
 - 구현 내용:
   - `PyMuPDF`: 텍스트/이미지 블록(`get_text("dict")`), `find_tables()` 기반 표 블록(지원되는 PDF에서)
   - `artifacts/stage1_ingestion/page_blocks.jsonl`, `parsing_report.json`, `ocr_routing.json` 출력
+  - 선택: `--build-rag-index` — OpenAI 임베딩 + **FAISS** 인덱스 `artifacts/stage1_ingestion/rag_index/`(`rag_manifest.json`, `faiss.index`, `metadata.jsonl`, 페이지·블록 계층 메타). `OPENAI_API_KEY` 필요; `--rag-embedding-model`, `--rag-openai-base-url` 지원.
   - 선택: `--ocr-full-page` 시 Tesseract 전면 OCR(라우팅된 페이지만, Tesseract PATH 필요)
   - 선택: `--text-backend`로 `pymupdf4llm` 보조 코퍼스(`pymupdf4llm_corpus.json`) 생성 가능 (`pymupdf4llm`/`hybrid`)
   - 선택: 헤더/푸터 제거 `--header-footer-mode`

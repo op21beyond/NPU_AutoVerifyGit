@@ -2,6 +2,14 @@
 streamlit>=1.33.0
 openai>=1.40.0
 
+# tools/rag_graph_chatbot — FAISS + Kuzu + Streamlit (also needs root requirements: faiss-cpu, kuzu, numpy)
+numpy>=1.24.0
+faiss-cpu>=1.8.0
+kuzu>=0.6.0
+
+# tools/ontology_graph_viewer — Pyvis (vis.js) for mission_ontology_graph.json
+pyvis>=0.3.2
+
 # tools/page_coverage_viewer — Node.js 기반 (pip 아님). Node.js LTS + npm 설치 후:
 #   cd tools/page_coverage_viewer && npm install && npm run dev
 # (메인 파이프라인의 page_coverage.png/json 은 루트 requirements.txt 의 matplotlib 로 생성)

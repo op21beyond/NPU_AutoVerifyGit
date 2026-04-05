@@ -1,49 +1,41 @@
 # Stage 5 - Mission Ontology and Constraint Typing
 
 ## Plan
-- 목표: 미션 전체 엔티티(IP/ExecutionUnit/명령어/필드/데이터타입/값도메인/제약/메타)를 온톨로지로 구성하고, 제약 유형을 동적 분류
-- 입력: `page_blocks`, `instruction_catalog`, `instruction_field_map`, `global_field_schema`, `field_alias_map`, `field_domain_catalog`
+- 목표: Stage4/4b/4c 산출과 `instruction_catalog`로 **미션 온톨로지**를 만들고, **제약(constraint)** 을 등록한다.
+- 입력: `datatype_registry`(Stage4), `field_datatype_catalog`(Stage4b), `field_domain_catalog`(Stage4c), `instruction_catalog`, `page_blocks`(선택 LLM 경로)
 - 출력:
-  - `mission_ontology_graph`
-  - `constraint_registry`
-  - `constraint_type_catalog`
-  - `constraint_classification_report`
-- 완료 기준:
-  - `IP/ExecutionUnit/Instruction/Field/DataType/ValueDomain/Constraint/Metadata` 엔티티 연결 완료
-  - 고정 타입 전제가 아닌 후보 수집/클러스터링 수행
-  - `ConstraintType` L1/L2 매핑
-  - 미분류 제약(`unclassified_constraint`) 관리
+  - `constraint_registry.jsonl` — `field_domain_catalog`에서 파생된 행 + (선택) **문서에서 LLM이 추출한 제약**
+  - `mission_ontology_graph.json` — IP / EU / Instruction / Field / DataType / Constraint 노드 및 엣지
+  - (OpenAI 사용 시) `constraint_candidates.json`, `constraint_type_catalog.json` — 후보 문장·**카테고리 정규화** 결과
+  - (OpenAI 사용 시) `ontology_value_bindings.json` — 온톨로지 노드에 대한 **값 추출** 바인딩
+  - `stage5_report.json` — 집계·스킵 사유
+  - `mission_graph_kuzu/graph.kuzu` — **Kuzu** 오픈소스 임베디드 그래프 DB(노드/엣지; `mission_ontology_graph.json`과 동일 내용). `--skip-kuzu-graph-db`로 생략 가능.
 
 ## Status
-- 상태: Implemented (`field_domain_catalog` 기반 제약 행 + `instruction_catalog`·타입·필드 연결 온톨로지)
-- 구현률: ~45%
-- Ground truth 옵션:
-  - `--ground-truth-as-output` + `--ground-truth PATH` — GT(`.json` 또는 `.txt/.lst/.list`)에서 `constraint_registry`·`mission_ontology_graph` 직접 기록
-  - `--ground-truth`만 — `constraint_id` 집합 및 온톨로지 `nodes(id)` / `edges(from,rel,to)` 기준으로 `evaluation_report.json`
-  - 예시 파일: `ground_truth_examples/stage5_ground_truth.txt`
-    - 평가: `python -m src.stage5_constraint_ontology.main --ground-truth ground_truth_examples/stage5_ground_truth.txt`
-    - 정답 직접 출력: `python -m src.stage5_constraint_ontology.main --ground-truth-as-output --ground-truth ground_truth_examples/stage5_ground_truth.txt`
-  - 텍스트 GT는 `CONSTRAINT|...`, `NODE|...`, `EDGE|from|rel|to` 라인 기반이며 부분 항목만 작성 가능
-  - `Instruction` 노드 id: `Instr:{opcode}` 또는 variation 있으면 **`Instr:{opcode}_{VAR}`** (파이프 구분자와 충돌 없음). `instruction_catalog`의 `variation` 반영
-- 오픈 이슈:
-  - 제약 후보 수집/클러스터링 미구현
-  - 온톨로지 그래프는 seed 수준
-- 다음 액션:
-  - 제약 추출 rule set 및 retrieval 파이프라인 연동
-  - `ConstraintType` 분류기와 미분류 큐 로직 구현
+- 구현: `build_constraint_registry` + `build_mission_ontology_graph` + **`llm_stage5`** (제약 문장 추출 → 카테고리 정규화 → 값 추출).
+- OpenAI: `OPENAI_API_KEY`가 있고 `--skip-llm-constraints` / `--skip-llm-values`를 주지 않으면 LLM 경로 실행.
+- 페이지 범위: `--page-start` / `--page-end` — Stage1과 동일 의미로 `page_blocks` 필터.
+- 선택: `--use-rag` 등 — LLM에 넣기 전 `page_blocks`를 Stage1 FAISS로 축소([`doc/rag_integration_checklist.md`](rag_integration_checklist.md)).
+
+## CLI
+```bash
+python -m src.stage5_constraint_ontology.main
+python -m src.stage5_constraint_ontology.main --page-start 1 --page-end 50
+python -m src.stage5_constraint_ontology.main --skip-llm-constraints --skip-llm-values   # 도메인 파생 제약만
+python -m src.stage5_constraint_ontology.main --use-rag --rag-top-k 48   # LLM 전 page_blocks FAISS 축소(Stage1 인덱스 필요)
+python -m src.stage5_constraint_ontology.main --skip-kuzu-graph-db       # JSON 그래프만; Kuzu 파일 생략
+```
+
+## Ground truth
+- `--ground-truth-as-output` + `ground_truth_examples/stage5_ground_truth.txt` 등 (기존과 동일).
 
 ## Technical Note
-- 온톨로지 핵심 관계:
-  - `IP HAS_INSTRUCTION Instruction`
-  - `Instruction EXECUTES_ON ExecutionUnit` (instruction_catalog의 `execution_unit` 반영)
-  - `Instruction` 속성: `instruction_kind` (macro/micro/unknown), OPCODE (`opcode_raw`, `opcode_radix`, `opcode_value`)
-  - `Instruction HAS_FIELD Field`
-  - `Field HAS_DATATYPE DataType`
-  - `Field HAS_DOMAIN ValueDomain`
-  - `Constraint INSTANCE_OF ConstraintType`
-  - `Constraint APPLIES_TO Instruction|Field|FieldSet`
-  - `Entity HAS_METADATA Metadata`
-- IP 메타 필수 속성:
-  - `ip_name`, `ip_type`, `ip_version`, `ip_additional_info`
-- 분류 실패를 삭제하지 않고 큐로 유지해야 정확도 개선 루프가 가능
-- 규칙 기반 분류 우선, LLM API는 미분류/충돌 케이스에만 사용
+- JSON 그래프 시각화: [`tools/ontology_graph_viewer`](../tools/ontology_graph_viewer/README.md) — `streamlit run tools/ontology_graph_viewer/app.py` (앱 내 사용 안내).
+- 온톨로지 핵심 관계(계획): `IP HAS_INSTRUCTION`, `Instruction EXECUTES_ON` EU, `Instruction HAS_FIELD`, `Field HAS_DATATYPE`, 제약은 `Field` 또는 `Instruction` 또는 문서 전역(`Document` → `IP:sample`)에 `APPLIES_TO`.
+- LLM 제약 행은 `constraint_type_level2`: `llm-document`.
+
+### 제약 카테고리 정규화 (휴리스틱 아님)
+- 1차 추출에서 나온 `constraint_category_candidate` 문자열들은 호출마다 표현이 달라질 수 있음(예: 값 범위 vs 허용 값).
+- **2차 LLM 호출**만으로 동의어·유사 표현을 묶어 `canonical_categories` + `mapping` 생성(코드에서 의미 클러스터링·편집거리 사용 안 함).
+- 같은 배치에 Stage4c `field_domain_catalog`의 `allowed_value_form`(예: `range`, `enum`)을 넣어, 도메인 메타와 추출 라벨을 한 번에 정규화한다.
+- 모델이 어떤 입력 키를 빠뜨린 경우에만 키 보존용으로 동일 문자열 매핑을 채운다(의미 추론은 LLM에만 의존).

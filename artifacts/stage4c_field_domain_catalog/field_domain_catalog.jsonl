@@ -1,0 +1,2 @@
+{"field_name": "OPCODE", "allowed_value_form": "range", "allowed_values_or_range": "0..63", "trace_id": "stage4c_field_domain_catalog-6b57b41d44b4:domain:0", "source_refs": []}
+{"field_name": "SRC0", "allowed_value_form": "range", "allowed_values_or_range": "enum{TILE_A,TILE_B}", "trace_id": "stage4c_field_domain_catalog-6b57b41d44b4:domain:1", "source_refs": []}

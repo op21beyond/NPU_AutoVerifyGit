@@ -1,7 +1,27 @@
 # 변경 이력
 
+## 2026-04-02
+
+- `tools/ontology_graph_viewer`: Streamlit + Pyvis로 `mission_ontology_graph.json` 시각화(앱 내 사용 방법·범례); `tools/requirements-tools.txt`에 `pyvis`.
+- Stage1 `--build-rag-index`: FAISS(`faiss-cpu`) + OpenAI 임베딩, `rag_index/`에 메타데이터·페이지 계층(`rag_manifest.json`).
+- 공통 `src/common/rag_index_faiss.py`, `rag_resolve.py`, `rag_cli.py`; Stage2·4·4b·4c·5 `--use-rag` 옵션 경로(LLM 전 블록 축소).
+- Stage5: Kuzu 임베디드 그래프 DB `mission_graph_kuzu/graph.kuzu`; `--skip-kuzu-graph-db`.
+- `tools/rag_graph_chatbot/app.py`: FAISS+Kuzu+OpenAI Streamlit 챗(경로/멀티턴 session state).
+- `requirements.txt`: numpy, faiss-cpu, kuzu; `integration_pipeline`에 `--build-rag-index` / `--use-rag` 전달.
+- 문서: `doc/rag_integration_checklist.md`(구현 요약·`ontology_graph_viewer`·로드맵 구분·`--use-rag` 표기), `tools/README.md`에 rag_graph_chatbot.
+- 문서: `doc/stage2_instruction_extraction.md`, `doc/stage4_domain_typing.md`, `doc/stage4b_field_datatype_catalog.md`, `doc/stage4c_field_domain_catalog.md`, `doc/stage_document_governance.md`, `README.md`에 RAG/Kuzu 반영.
+
 ## 2026-04-06
 
+- Stage4: 휴리스틱 제거 → OpenAI로 `datatype_registry`만 생성; `--page-start`/`--page-end`; `extraction_summary.json`.
+- Stage4b `stage4b_field_datatype_catalog`: OpenAI로 `field_datatype_catalog`; Stage4c `stage4c_field_domain_catalog`: OpenAI로 `field_domain_catalog`; 각 GT 예제 `ground_truth_examples/stage4*_ground_truth.txt`.
+- Stage5: 입력 아티팩트를 Stage4/4b/4c 산출 경로로 분리.
+- Stage5: `page_blocks` + OpenAI로 제약 후보 추출(`constraint_candidates.json`)·카테고리 정규화(`constraint_type_catalog.json`)·온톨로지 값 바인딩(`ontology_value_bindings.json`); `stage5_report.json`; `--skip-llm-constraints` / `--skip-llm-values`; 통합 파이프라인에 Stage5 페이지 인자.
+- Stage5: 카테고리 정규화 2차 LLM 프롬프트 강화(`merge_rationale`); Stage4c `allowed_value_form` 라벨을 정규화 배치에 포함.
+- 공통: `src/common/llm_page_blocks.py`, `openai_json.py`; Stage2 `llm_openai`가 직렬화 공유.
+- 문서: `README.md`, `doc/integration_pipeline.md`, `doc/stage3_field_table_parsing.md`에 Stage3 페이지 범위·`parsing_summary`(`instruction_scope_coverage` 등) 반영.
+- Stage3: `--page-start` / `--page-end`로 `page_blocks` 필터(Stage2·`page_range`와 동일 의미); `parsing_summary`에 `page_range`·`page_blocks_path` 기록; `integration_pipeline`이 Stage3에 페이지 인자 전달.
+- Stage3: `--field-cheat-sheet` JSON으로 스코프별 필드 오버라이드(`field_cheat_sheet.py`), `field_cheat_sheet.example.json`; `integration_pipeline`이 동일 인자를 Stage3에 전달.
 - `.cursor/rules/plan_and_doc_sync_rule.md`: `CHANGES.md` 갱신 의무·형식(날짜별 한 줄)·체크리스트 반영.
 
 ## 2026-04-05
@@ -19,6 +39,7 @@
 
 ## 2026-04-02
 
+- Stage3 `parsing_summary.json`: `instruction_scope_coverage` (카탈로그 스코프 대비 완전·부재·불확실, `per_scope_status`, 출력 전용 스코프 `extra_scopes_in_output`).
 - Stage2 기본 추출: OpenAI(LLM), `--ground-truth-as-catalog`만 대안; regex 경로 제거.
 - Stage1·Stage2: `--page-start` / `--page-end` 동일 의미(미지정=전체, 단일 인자=한쪽 끝까지).
 - Stage2: `page_coverage.json` / `page_coverage.png` 기본 출력(`matplotlib`), `--no-page-coverage`로 끔.

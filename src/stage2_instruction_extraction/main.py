@@ -25,6 +25,8 @@ from src.stage2_instruction_extraction.page_coverage import (
     resolve_coverage_page_range,
     write_page_coverage_png,
 )
+from src.common.rag_cli import add_rag_arguments
+from src.common.rag_resolve import DEFAULT_RAG_QUERIES, narrow_page_blocks_with_optional_rag
 
 
 def main() -> None:
@@ -88,9 +90,11 @@ def main() -> None:
         action="store_true",
         help="Do not write page_coverage.json / page_coverage.png (default: write after OpenAI extraction)",
     )
+    add_rag_arguments(parser)
     args = parser.parse_args()
 
     run = StageRun.create("stage2_instruction_extraction")
+    rag_stats: dict | None = None
 
     if args.ground_truth_as_catalog:
         if not args.ground_truth:
@@ -123,8 +127,16 @@ def main() -> None:
         else:
             page_range_applied = None
 
-        rows = build_instruction_catalog_openai(
+        pb_for_llm, rag_stats = narrow_page_blocks_with_optional_rag(
             page_blocks,
+            args,
+            default_rag_query=DEFAULT_RAG_QUERIES["stage2_instruction_extraction"],
+        )
+        if rag_stats and rag_stats.get("rag_error"):
+            print(f"WARNING: RAG failed ({rag_stats['rag_error']}); using full page_blocks.")
+
+        rows = build_instruction_catalog_openai(
+            pb_for_llm,
             run,
             model=args.openai_model,
             base_url=args.openai_base_url,
@@ -149,6 +161,7 @@ def main() -> None:
             else None
         ),
         "output_schema_version": "instruction_catalog@2",
+        "rag": rag_stats,
     }
 
     if args.ground_truth and not args.ground_truth_as_catalog:

@@ -1,2 +1,2 @@
-{"constraint_id": "C_OPCODE_RANGE", "trace_id": "stage5_constraint_ontology-b67a471102de:c:gt:0", "source_refs": []}
-{"constraint_id": "C_SRC0_TILE_FMT", "trace_id": "stage5_constraint_ontology-b67a471102de:c:gt:1", "source_refs": []}
+{"trace_id": "stage5_constraint_ontology-1724e1a5f460:c:0", "constraint_id": "C_OPCODE_0000", "constraint_type_level1": "range", "constraint_type_level2": "field-domain", "expression": "OPCODE \u2208 0..63", "classification_rationale": "derived from field_domain_catalog", "source_refs": [], "applies_to": {"entity_type": "Field", "entity_name": "OPCODE"}}
+{"trace_id": "stage5_constraint_ontology-1724e1a5f460:c:1", "constraint_id": "C_SRC0_0001", "constraint_type_level1": "range", "constraint_type_level2": "field-domain", "expression": "SRC0 \u2208 enum{TILE_A,TILE_B}", "classification_rationale": "derived from field_domain_catalog", "source_refs": [], "applies_to": {"entity_type": "Field", "entity_name": "SRC0"}}

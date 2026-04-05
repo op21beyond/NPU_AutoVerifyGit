@@ -15,6 +15,13 @@ paddleocr>=2.7.0
 
 # Stage 2: OpenAI extraction (set OPENAI_API_KEY) unless --ground-truth-as-catalog
 openai>=1.40.0
+
+# RAG (Stage1 --build-rag-index) + optional LLM narrowing (Stage2/4/4b/4c/5 --use-rag)
+numpy>=1.24.0
+faiss-cpu>=1.8.0
+
+# Stage5: embedded open-source graph DB export (mission_graph_kuzu/)
+kuzu>=0.6.0
 # Stage 2: default page_coverage.png
 matplotlib>=3.8.0
 

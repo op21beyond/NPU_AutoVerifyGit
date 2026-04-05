@@ -1,2 +1,2 @@
-{"type_id": "uint6", "type_name_raw": "uint6", "category": "software_primitive", "trace_id": "stage4_domain_typing-7f47def7f4a0:reg:0", "source_refs": []}
-{"type_id": "NPU_TILE_FMT", "type_name_raw": "NPU_TILE_FMT", "category": "ip_architecture", "trace_id": "stage4_domain_typing-7f47def7f4a0:reg:1", "source_refs": []}
+{"type_id": "uint6", "type_name_raw": "uint6", "category": "software_primitive", "trace_id": "stage4_domain_typing-aa684963834d:reg:0", "source_refs": []}
+{"type_id": "NPU_TILE_FMT", "type_name_raw": "NPU_TILE_FMT", "category": "ip_architecture", "trace_id": "stage4_domain_typing-aa684963834d:reg:1", "source_refs": []}

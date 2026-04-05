@@ -1,0 +1,8 @@
+{
+  "stage_run_id": "stage4_domain_typing-aa684963834d",
+  "mode": "ground_truth_as_output",
+  "datatype_registry_row_count": 2,
+  "ground_truth_path": "D:\\Users\\op21b\\NPU_AutoVerify\\ground_truth_examples\\stage4_datatype_registry_ground_truth.txt",
+  "page_range": null,
+  "page_blocks_path": null
+}
