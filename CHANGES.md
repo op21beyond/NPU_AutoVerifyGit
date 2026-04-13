@@ -2,6 +2,9 @@
 
 ## 2026-04-02
 
+- Stage5 `field_domain_catalog` → `constraint_registry`: `enum`은 `IN`, `range`는 `lo <= FIELD <= hi`(빈 도메인은 placeholder); `domain_constraint_meta`; `constraint_pruning_index.json` + `stage5_report` 경로; Stage6 `combination_context.json`이 프루닝 인덱스 스냅샷 로드.
+- 테스트: `tests/test_stage5_domain_constraints.py`, (선택) `OPENAI_API_KEY` 시 `tests/test_stage5_llm_constraints_optional.py`.
+- 문서: `doc/stage5_constraint_ontology.md`, `doc/stage6_combination_generation.md` 갱신.
 - `tools/ontology_graph_viewer`: Streamlit + Pyvis로 `mission_ontology_graph.json` 시각화(앱 내 사용 방법·범례); `tools/requirements-tools.txt`에 `pyvis`.
 - Stage1 `--build-rag-index`: FAISS(`faiss-cpu`) + OpenAI 임베딩, `rag_index/`에 메타데이터·페이지 계층(`rag_manifest.json`).
 - 공통 `src/common/rag_index_faiss.py`, `rag_resolve.py`, `rag_cli.py`; Stage2·4·4b·4c·5 `--use-rag` 옵션 경로(LLM 전 블록 축소).

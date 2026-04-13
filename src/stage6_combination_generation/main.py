@@ -11,6 +11,17 @@ def main() -> None:
     global_schema = load_json(gpath) if gpath.exists() else {}
     _canonical = global_schema.get("canonical_field_names", [])
 
+    s5 = artifact_path("stage5_constraint_ontology", "constraint_pruning_index.json")
+    pruning = load_json(s5) if s5.exists() else {}
+    # Future: prune combinations using pruning["canonical_categories"] + per-row constraint_type_level1
+    combination_context = {
+        "stage_run_id": run.stage_run_id,
+        "constraint_pruning_index": pruning,
+        "constraint_registry_row_count": len(constraints),
+        "canonical_categories_ref": (pruning or {}).get("canonical_categories") or [],
+    }
+    write_json(artifact_path("stage6_combination_generation", "combination_context.json"), combination_context)
+
     rows = [
         {
             "trace_id": f"{run.stage_run_id}:t0",

@@ -5,10 +5,11 @@
 - 입력: `datatype_registry`(Stage4), `field_datatype_catalog`(Stage4b), `field_domain_catalog`(Stage4c), `instruction_catalog`, `page_blocks`(선택 LLM 경로)
 - 출력:
   - `constraint_registry.jsonl` — `field_domain_catalog`에서 파생된 행 + (선택) **문서에서 LLM이 추출한 제약**
+  - `constraint_pruning_index.json` — `constraint_type_catalog`의 **canonical 카테고리**와 레지스트리 행(`constraint_type_level1` 등)을 묶은 **Stage6 프루닝 연계용 요약**(실제 프루닝은 Stage6에서 단계적 구현)
   - `mission_ontology_graph.json` — IP / EU / Instruction / Field / DataType / Constraint 노드 및 엣지
   - (OpenAI 사용 시) `constraint_candidates.json`, `constraint_type_catalog.json` — 후보 문장·**카테고리 정규화** 결과
   - (OpenAI 사용 시) `ontology_value_bindings.json` — 온톨로지 노드에 대한 **값 추출** 바인딩
-  - `stage5_report.json` — 집계·스킵 사유
+  - `stage5_report.json` — 집계·스킵 사유(`constraint_pruning_index_path` 포함)
   - `mission_graph_kuzu/graph.kuzu` — **Kuzu** 오픈소스 임베디드 그래프 DB(노드/엣지; `mission_ontology_graph.json`과 동일 내용). `--skip-kuzu-graph-db`로 생략 가능.
 
 ## Status
@@ -30,6 +31,8 @@ python -m src.stage5_constraint_ontology.main --skip-kuzu-graph-db       # JSON 
 - `--ground-truth-as-output` + `ground_truth_examples/stage5_ground_truth.txt` 등 (기존과 동일).
 
 ## Technical Note
+- **도메인 파생 제약 표현**: `field_domain_catalog` 한 줄당 한 제약 행. `allowed_value_form`이 `enum`이면 `FIELD IN (…)`, `range`이면 `lo <= FIELD <= hi`(점 범위·하이픈·16진 `0x..0x` 패턴 지원). `allowed_values_or_range`가 비어 있으면 의미 없는 기호 대신 **명시적 placeholder** 표현을 씀. 행에 `domain_constraint_meta`(구조화 메타)가 붙을 수 있음.
+- **교차 필드·조건부 제약**(예: opcode에 따른 필드 값)은 도메인 한 줄로는 표현되지 않음 → LLM 경로(`extract_constraint_candidates_openai`) 또는 후속 규칙 엔진이 필요. 품질 확인용으로 `OPENAI_API_KEY`가 있을 때만 실행되는 스모크 테스트: `tests/test_stage5_llm_constraints_optional.py`.
 - JSON 그래프 시각화: [`tools/ontology_graph_viewer`](../tools/ontology_graph_viewer/README.md) — `streamlit run tools/ontology_graph_viewer/app.py` (앱 내 사용 안내).
 - 온톨로지 핵심 관계(계획): `IP HAS_INSTRUCTION`, `Instruction EXECUTES_ON` EU, `Instruction HAS_FIELD`, `Field HAS_DATATYPE`, 제약은 `Field` 또는 `Instruction` 또는 문서 전역(`Document` → `IP:sample`)에 `APPLIES_TO`.
 - LLM 제약 행은 `constraint_type_level2`: `llm-document`.

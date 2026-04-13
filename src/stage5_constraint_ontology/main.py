@@ -14,6 +14,7 @@ from src.common.page_range import (
 from src.common.runtime import StageRun, artifact_path
 
 from src.stage5_constraint_ontology.constraint_ontology import (
+    build_constraint_pruning_index,
     build_constraint_registry,
     build_mission_ontology_graph,
 )
@@ -181,6 +182,8 @@ def main() -> None:
                 llm_skip_reason = f"llm_values_failed: {ex}"
 
     write_jsonl(out_dir / "constraint_registry.jsonl", all_constraints)
+    pruning_index = build_constraint_pruning_index(all_constraints, category_payload)
+    write_json(out_dir / "constraint_pruning_index.json", pruning_index)
     write_json(out_dir / "mission_ontology_graph.json", ontology)
     if value_bindings:
         write_json(out_dir / "ontology_value_bindings.json", {"bindings": value_bindings})
@@ -202,6 +205,7 @@ def main() -> None:
         "llm_values_ran": bool(value_bindings),
         "llm_skip_reason": llm_skip_reason,
         "rag": rag_stats,
+        "constraint_pruning_index_path": str((out_dir / "constraint_pruning_index.json").resolve()),
     }
     if not args.skip_kuzu_graph_db:
         kuzu_dir = out_dir / "mission_graph_kuzu"

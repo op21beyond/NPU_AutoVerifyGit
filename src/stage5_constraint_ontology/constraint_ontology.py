@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, List, Set, Tuple
+from collections import Counter
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from src.common.instruction_key import catalog_row_key, normalize_variation
 from src.common.runtime import StageRun
@@ -27,6 +28,108 @@ def instruction_node_id(inst: Dict[str, Any]) -> str:
     if var:
         return f"{base}_{var}"
     return base
+
+
+def _normalize_allowed_value_form(raw: str) -> str:
+    s = (raw or "range").strip().lower()
+    if s in ("enum", "range", "mask", "set", "other"):
+        return s
+    return "range"
+
+
+def domain_expression_and_meta(
+    field_name: str,
+    allowed_value_form: str,
+    allowed_values_or_range: str,
+) -> Tuple[str, Dict[str, Any]]:
+    """
+    Build a readable constraint expression and optional structured_domain metadata.
+    - enum + non-empty av: FIELD IN (a, b, c)
+    - range + parsable bounds: lo <= FIELD <= hi (supports a..b, a-b, 0x0..0xF)
+    - empty av: explicit placeholder (no fake ∈ empty)
+    """
+    fn = (field_name or "UNKNOWN").strip() or "UNKNOWN"
+    avf = _normalize_allowed_value_form(allowed_value_form)
+    av = (allowed_values_or_range or "").strip()
+    meta: Dict[str, Any] = {"allowed_value_form": avf}
+
+    if not av:
+        meta["domain_value_unspecified"] = True
+        if avf == "enum":
+            expr = f"{fn} IN (/* unspecified — fill allowed_values_or_range in field_domain_catalog */)"
+        elif avf == "range":
+            expr = f"{fn} RANGE (/* unspecified — fill allowed_values_or_range in field_domain_catalog */)"
+        elif avf == "mask":
+            expr = f"{fn} MASK (/* unspecified */)"
+        elif avf == "set":
+            expr = f"{fn} SET (/* unspecified */)"
+        else:
+            expr = f"{fn} ({avf}, values unspecified)"
+        return expr, meta
+
+    if avf == "enum":
+        parts = re.split(r"[|,;]+", av)
+        tokens = [p.strip() for p in parts if p.strip()]
+        if not tokens:
+            tokens = [av]
+        meta["structured_domain"] = {"form": "enum", "values": tokens}
+        inner = ", ".join(tokens)
+        return f"{fn} IN ({inner})", meta
+
+    if avf == "range":
+        # a..b or a..b with hex
+        m = re.search(
+            r"(0x[0-9a-fA-F]+|\d+)\s*\.\.\s*(0x[0-9a-fA-F]+|\d+)",
+            av,
+        )
+        if m:
+            lo, hi = m.group(1), m.group(2)
+            meta["structured_domain"] = {"form": "range", "lo_raw": lo, "hi_raw": hi}
+            return f"{lo} <= {fn} <= {hi}", meta
+        m2 = re.search(r"(\d+)\s*-\s*(\d+)", av)
+        if m2:
+            lo, hi = m2.group(1), m2.group(2)
+            meta["structured_domain"] = {"form": "range", "lo_raw": lo, "hi_raw": hi}
+            return f"{lo} <= {fn} <= {hi}", meta
+        meta["structured_domain"] = {"form": "range", "raw": av}
+        return f"{fn} RANGE {av}", meta
+
+    if avf in ("mask", "set", "other"):
+        meta["structured_domain"] = {"form": avf, "raw": av}
+        return f"{fn} ({avf}) {av}", meta
+
+    meta["structured_domain"] = {"form": avf, "raw": av}
+    return f"{fn} {avf} {av}", meta
+
+
+def build_constraint_pruning_index(
+    constraints: List[Dict[str, Any]],
+    category_payload: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """
+    Bridge file for Stage6+: ties constraint_type_catalog canonical labels to registry rows
+    (via constraint_type_level1 on each row).
+    """
+    by_l1: Counter = Counter()
+    by_l2: Counter = Counter()
+    for c in constraints:
+        by_l1[str(c.get("constraint_type_level1") or "")] += 1
+        by_l2[str(c.get("constraint_type_level2") or "")] += 1
+
+    cp = category_payload or {}
+    return {
+        "schema_version": "constraint_pruning_index@1",
+        "canonical_categories": list(cp.get("canonical_categories") or []),
+        "category_mapping": dict(cp.get("mapping") or {}),
+        "merge_rationale": cp.get("merge_rationale"),
+        "constraint_counts_by_level1": dict(by_l1),
+        "constraint_counts_by_level2": dict(by_l2),
+        "stage6_integration": {
+            "constraint_registry_field_for_pruning": "constraint_type_level1",
+            "description": "LLM rows use normalized canonical categories in level1; field-domain rows use allowed_value_form (enum/range/...). Join with canonical_categories for pruning groups.",
+            "artifact_files": ["constraint_type_catalog.json", "constraint_registry.jsonl"],
+        },
+    }
 
 
 def build_constraint_registry(
@@ -56,18 +159,20 @@ def build_constraint_registry(
         avf = str(d.get("allowed_value_form", "range")).strip() or "range"
         av = str(d.get("allowed_values_or_range", "")).strip()
         cid = f"C_{_norm_field_id(fn)}_{i:04d}"
-        out.append(
-            {
-                "trace_id": f"{run.stage_run_id}:c:{i}",
-                "constraint_id": cid,
-                "constraint_type_level1": avf,
-                "constraint_type_level2": "field-domain",
-                "expression": f"{fn} ∈ {av}" if av else f"{fn} domain ({avf})",
-                "classification_rationale": "derived from field_domain_catalog",
-                "source_refs": d.get("source_refs") or [],
-                "applies_to": {"entity_type": "Field", "entity_name": fn},
-            }
-        )
+        expr, dom_meta = domain_expression_and_meta(fn, avf, av)
+        row: Dict[str, Any] = {
+            "trace_id": f"{run.stage_run_id}:c:{i}",
+            "constraint_id": cid,
+            "constraint_type_level1": _normalize_allowed_value_form(avf),
+            "constraint_type_level2": "field-domain",
+            "expression": expr,
+            "classification_rationale": "derived from field_domain_catalog",
+            "source_refs": d.get("source_refs") or [],
+            "applies_to": {"entity_type": "Field", "entity_name": fn},
+        }
+        if dom_meta:
+            row["domain_constraint_meta"] = dom_meta
+        out.append(row)
     return out
 
 
