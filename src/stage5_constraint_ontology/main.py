@@ -29,8 +29,10 @@ from src.stage5_constraint_ontology.llm_stage5 import (
     llm_items_to_constraint_rows,
     normalize_constraint_categories_openai,
 )
+from src.common.lightrag_cli import add_lightrag_arguments
+from src.common.lightrag_resolve import narrow_page_blocks_for_stage5_llm
 from src.common.rag_cli import add_rag_arguments
-from src.common.rag_resolve import DEFAULT_RAG_QUERIES, narrow_page_blocks_with_optional_rag
+from src.common.rag_resolve import DEFAULT_RAG_QUERIES
 from src.stage5_constraint_ontology.mission_graph_kuzu import export_mission_ontology_to_kuzu
 
 
@@ -66,12 +68,15 @@ def main() -> None:
         help="Skip extraction and write stage5 artifacts directly from --ground-truth.",
     )
     add_rag_arguments(parser)
+    add_lightrag_arguments(parser)
     parser.add_argument(
         "--skip-kuzu-graph-db",
         action="store_true",
         help="Do not export mission_ontology_graph to embedded Kuzu DB (mission_graph_kuzu/).",
     )
     args = parser.parse_args()
+    if getattr(args, "use_rag", False) and getattr(args, "use_lightrag", False):
+        raise SystemExit("Use either --use-rag or --use-lightrag, not both.")
 
     run = StageRun.create("stage5_constraint_ontology")
     out_dir = artifact_path("stage5_constraint_ontology")
@@ -99,13 +104,15 @@ def main() -> None:
         page_blocks = filter_page_blocks_by_page_range(page_blocks, first_p, last_p)
         page_range_applied = (first_p, last_p)
 
-    pb_for_llm, rag_stats = narrow_page_blocks_with_optional_rag(
+    pb_for_llm, rag_stats = narrow_page_blocks_for_stage5_llm(
         page_blocks,
         args,
         default_rag_query=DEFAULT_RAG_QUERIES["stage5_constraint_extract"],
     )
     if rag_stats and rag_stats.get("rag_error"):
         print(f"WARNING: RAG failed ({rag_stats['rag_error']}); using full page_blocks.")
+    if rag_stats and rag_stats.get("lightrag_error"):
+        print(f"WARNING: LightRAG failed ({rag_stats['lightrag_error']}); using full page_blocks.")
 
     domains = load_jsonl(artifact_path("stage4c_field_domain_catalog", "field_domain_catalog.jsonl"))
     datatype_catalog = load_jsonl(artifact_path("stage4b_field_datatype_catalog", "field_datatype_catalog.jsonl"))

@@ -16,7 +16,7 @@
 - 구현: `build_constraint_registry` + `build_mission_ontology_graph` + **`llm_stage5`** (제약 문장 추출 → 카테고리 정규화 → 값 추출).
 - OpenAI: `OPENAI_API_KEY`가 있고 `--skip-llm-constraints` / `--skip-llm-values`를 주지 않으면 LLM 경로 실행.
 - 페이지 범위: `--page-start` / `--page-end` — Stage1과 동일 의미로 `page_blocks` 필터.
-- 선택: `--use-rag` 등 — LLM에 넣기 전 `page_blocks`를 Stage1 FAISS로 축소([`doc/rag_integration_checklist.md`](rag_integration_checklist.md)).
+- 선택: `--use-rag` — LLM에 넣기 전 `page_blocks`를 Stage1 FAISS로 축소; 또는 **`--use-lightrag`** — [LightRAG](https://github.com/hkuds/lightrag)(`lightrag-hku`)로 블록별 인덱싱 후 `aquery_data`로 관련 청크만 선택(FAISS와 Stage5에서 동시 사용 불가). [`doc/rag_integration_checklist.md`](rag_integration_checklist.md).
 
 ## CLI
 ```bash
@@ -24,6 +24,8 @@ python -m src.stage5_constraint_ontology.main
 python -m src.stage5_constraint_ontology.main --page-start 1 --page-end 50
 python -m src.stage5_constraint_ontology.main --skip-llm-constraints --skip-llm-values   # 도메인 파생 제약만
 python -m src.stage5_constraint_ontology.main --use-rag --rag-top-k 48   # LLM 전 page_blocks FAISS 축소(Stage1 인덱스 필요)
+python -m src.stage5_constraint_ontology.main --use-lightrag --rag-top-k 48   # LightRAG 인덱스(기본: artifacts/.../lightrag_working)
+python -m src.stage5_constraint_ontology.main --use-lightrag --lightrag-no-rebuild --lightrag-query-mode naive
 python -m src.stage5_constraint_ontology.main --skip-kuzu-graph-db       # JSON 그래프만; Kuzu 파일 생략
 ```
 
@@ -31,6 +33,7 @@ python -m src.stage5_constraint_ontology.main --skip-kuzu-graph-db       # JSON 
 - `--ground-truth-as-output` + `ground_truth_examples/stage5_ground_truth.txt` 등 (기존과 동일).
 
 ## Technical Note
+- **LightRAG**: 인덱싱 시 엔티티 추출 등으로 LLM·임베딩 비용이 큼. `--lightrag-query-mode`(기본 `naive`)는 벡터 청크 검색 중심; `local`/`mix` 등은 지식 그래프 구성이 필요. 작업 디렉터리는 `--lightrag-working-dir` 또는 기본 `artifacts/stage5_constraint_ontology/lightrag_working`. 기본은 매 실행 시 작업 디렉터리를 비우고 재색인(`--lightrag-no-rebuild`로 기존 인덱스만 재질의).
 - **도메인 파생 제약 표현**: `field_domain_catalog` 한 줄당 한 제약 행. `allowed_value_form`이 `enum`이면 `FIELD IN (…)`, `range`이면 `lo <= FIELD <= hi`(점 범위·하이픈·16진 `0x..0x` 패턴 지원). `allowed_values_or_range`가 비어 있으면 의미 없는 기호 대신 **명시적 placeholder** 표현을 씀. 행에 `domain_constraint_meta`(구조화 메타)가 붙을 수 있음.
 - **교차 필드·조건부 제약**(예: opcode에 따른 필드 값)은 도메인 한 줄로는 표현되지 않음 → LLM 경로(`extract_constraint_candidates_openai`) 또는 후속 규칙 엔진이 필요. 품질 확인용으로 `OPENAI_API_KEY`가 있을 때만 실행되는 스모크 테스트: `tests/test_stage5_llm_constraints_optional.py`.
 - JSON 그래프 시각화: [`tools/ontology_graph_viewer`](../tools/ontology_graph_viewer/README.md) — `streamlit run tools/ontology_graph_viewer/app.py` (앱 내 사용 안내).

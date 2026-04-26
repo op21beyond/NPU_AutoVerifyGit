@@ -2,6 +2,7 @@
 
 ## 2026-04-02
 
+- Stage5: [LightRAG](https://github.com/hkuds/lightrag)(`lightrag-hku`) 선택 경로 `--use-lightrag` + `src/common/lightrag_resolve.py` / `lightrag_cli.py`; FAISS `--use-rag`와 동시 사용 불가. `requirements.txt`에 `lightrag-hku`. 통합 파이프라인에 `--use-lightrag` 등 Stage5 전용 인자.
 - Stage5 `field_domain_catalog` → `constraint_registry`: `enum`은 `IN`, `range`는 `lo <= FIELD <= hi`(빈 도메인은 placeholder); `domain_constraint_meta`; `constraint_pruning_index.json` + `stage5_report` 경로; Stage6 `combination_context.json`이 프루닝 인덱스 스냅샷 로드.
 - 테스트: `tests/test_stage5_domain_constraints.py`, (선택) `OPENAI_API_KEY` 시 `tests/test_stage5_llm_constraints_optional.py`.
 - 문서: `doc/stage5_constraint_ontology.md`, `doc/stage6_combination_generation.md` 갱신.

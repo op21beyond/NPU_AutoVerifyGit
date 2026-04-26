@@ -4,6 +4,7 @@
 
 - **Stage1** `--build-rag-index`: OpenAI 임베딩 + **FAISS** `IndexFlatIP`, `artifacts/stage1_ingestion/rag_index/` (`rag_manifest.json`, `faiss.index`, `metadata.jsonl`, 페이지→블록 계층은 manifest `page_hierarchy`).
 - **Stage2 / 4 / 4b / 4c / 5**: `--use-rag` + `--rag-index-dir`(선택) + `--rag-top-k` + `--rag-query`(선택) + `--rag-embedding-model` — LLM 호출 전 `narrow_page_blocks_with_optional_rag`로 블록 축소; `extraction_summary` / `stage5_report`에 `rag` 통계.
+- **Stage5 (선택)** [LightRAG](https://github.com/hkuds/lightrag): `--use-lightrag` + `src/common/lightrag_resolve.py` — `lightrag-hku`로 블록 인덱싱 후 `aquery_data`로 축소; FAISS `--use-rag`와 동시 사용 불가. 통합 파이프라인은 `--use-rag`로 2~4c에 FAISS를 주면서 Stage5만 `--use-lightrag`로 줄 수 있음.
 - **Stage5** 끝: **Kuzu** 오픈소스 임베디드 그래프 DB `mission_graph_kuzu/graph.kuzu` (`--skip-kuzu-graph-db`로 생략 가능).
 - **도구**: `tools/rag_graph_chatbot/app.py` — FAISS + Kuzu + OpenAI 멀티턴 챗.
 - **도구**: `tools/ontology_graph_viewer/app.py` — `mission_ontology_graph.json` Pyvis 시각화(앱 내 사용 안내).
